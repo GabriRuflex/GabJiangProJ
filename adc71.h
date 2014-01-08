@@ -5,12 +5,12 @@
 using namespace std;
 using namespace miosix;
 
-#define PERIPH_BASE			((uint32_t)0x40000000) /*Peripheral base address in the alias region*/
-#define APB2PERIPH_BASE			(PERIPH_BASE + 0x00010000)
-#define ADC1_BASE			(APB2PERIPH_BASE + 0x2000)
-#define ADC1				((ADC_TypeDef *) ADC1_BASE)
+#define PERIPH_BASE                        ((uint32_t)0x40000000) /*Peripheral base address in the alias region*/
+#define APB2PERIPH_BASE                    (PERIPH_BASE + 0x00010000)
+#define ADC1_BASE                          (APB2PERIPH_BASE + 0x2000)
+#define ADC1                               ((ADC_TypeDef *) ADC1_BASE)
 
-#define POLLING				0
+#define POLLING                            0
 #define DEBUG
 
 #ifdef DEBUG
@@ -23,31 +23,31 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 
 /* ADC definitions */
 /* CR1 register Mask */
-#define CR1_CLEAR_MASK			((uint32_t)0xFCFFFEFF)
+#define CR1_CLEAR_MASK                     ((uint32_t)0xFCFFFEFF)
 /* CR2 register Mask */
-#define CR2_CLEAR_MASK			((uint32_t)0xC0FFF7FD)
+#define CR2_CLEAR_MASK                     ((uint32_t)0xC0FFF7FD)
 /* ADC L Mask */
-#define SQR1_L_RESET			((uint32_t)0xFF0FFFFF) 
+#define SQR1_L_RESET                       ((uint32_t)0xFF0FFFFF) 
 /* ADC_resolution */ 
-#define ADC_Resolution_12b		((uint32_t)0x00000000)
+#define ADC_Resolution_12b	               ((uint32_t)0x00000000)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
-#define ADC_ExternalTrigConvEdge_None	((uint32_t)0x00000000)
+#define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00000000)
 /* ADC_extrenal_trigger_sources_for_regular_channels_conversion */ 
-#define ADC_ExternalTrigConv_T1_CC1	((uint32_t)0x00000000)
+#define ADC_ExternalTrigConv_T1_CC1        ((uint32_t)0x00000000)
 /* ADC_data_align */ 
-#define ADC_DataAlign_Right		((uint32_t)0x00000000)
+#define ADC_DataAlign_Right                ((uint32_t)0x00000000)
 /* RCC_APB2_Peripherals */ 
-#define RCC_APB2Periph_ADC		((uint32_t)0x00000100)
+#define RCC_APB2Periph_ADC                 ((uint32_t)0x00000100)
 /* ADC_channels */ 
-#define ADC_Channel_8			((uint8_t)0x08)
+#define ADC_Channel_8                      ((uint8_t)0x08)
 /* ADC_sampling_times */ 
-#define ADC_SampleTime_3Cycles		((uint8_t)0x00)
+#define ADC_SampleTime_3Cycles	           ((uint8_t)0x00)
 /* ADC SMPx mask */  
-#define SMPR2_SMP_SET			((uint32_t)0x00000007) 
+#define SMPR2_SMP_SET		                 	 ((uint32_t)0x00000007) 
 /* ADC SQx mask */
-#define SQR3_SQ_SET			((uint32_t)0x0000001F)
+#define SQR3_SQ_SET			                   ((uint32_t)0x0000001F)
 /* RCC_APB1_Peripherals */ 
-#define RCC_APB1Periph_TIM4              ((uint32_t)0x00000004)
+#define RCC_APB1Periph_TIM4                ((uint32_t)0x00000004)
 
 /*Timer definitions*/
 /* TIM_Counter_Mode */
