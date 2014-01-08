@@ -54,10 +54,7 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 /* ADC SQx mask */
 #define SQR3_SQ_SET									((uint32_t)0x0000001F)
 
-/* ADC_flags_definition  */ 
-#define ADC_FLAG_EOC								((uint8_t)0x02)
-
-unsigned int adcval, ticks = 0;
+unsigned int adcval;
 
 /* RCC_APB1_Peripherals */ 
 #define RCC_APB1Periph_TIM4              ((uint32_t)0x00000004)
@@ -269,7 +266,7 @@ void InitializeTimer()
 	TIM_TimeBaseInitTypeDef timerInitStructure;
 	timerInitStructure.TIM_Prescaler = 84000 - 1; // 168000 MHz / 8400 = 2kHz
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 500 - 1; // 500 / 2kHz = 0,25 sec
+	timerInitStructure.TIM_Period = 2 - 1; // 2 / 2kHz = 0,001 sec
 	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	timerInitStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM4, &timerInitStructure);
@@ -624,10 +621,10 @@ uint16_t ADC_SingleAcquisition()
 	ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
 
 	/* Wait until ADCx end of conversion */ 
-  	while((ADC1->SR & ADC_FLAG_EOC) == 0);
+  	while((ADC1->SR & ADC_SR_EOC) == 0);
 
 	/* Get ADCx conversion value */
-	res = (uint16_t) ADC1->DR;
+	res = (uint16_t)ADC1->DR;
 
 	return res;	
 }
@@ -712,7 +709,7 @@ int main()
 	{
 		InitializeTimer();
 		EnableTimerInterrupt();
-		while(1) { asm("nop"); }
+		while(1);
 	}
 
 	return 0;
