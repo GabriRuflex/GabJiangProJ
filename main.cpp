@@ -1,135 +1,8 @@
-#include <cstdio>
-#include <unistd.h>
-#include "miosix.h"
-
-using namespace std;
-using namespace miosix;
-
-#define PERIPH_BASE									((uint32_t)0x40000000) /*Peripheral base address in the alias region*/
-#define APB2PERIPH_BASE								(PERIPH_BASE + 0x00010000)
-#define ADC1_BASE									(APB2PERIPH_BASE + 0x2000)
-#define ADC1										((ADC_TypeDef *) ADC1_BASE)
-
-#define POLLING										0
-
-typedef Gpio<GPIOB_BASE,0> adcGPIO;
-typedef Gpio<GPIOD_BASE,12> ledGreen;
-typedef Gpio<GPIOD_BASE,13> ledOrange;
-typedef Gpio<GPIOD_BASE,14> ledRed;
-typedef Gpio<GPIOD_BASE,15> ledBlue;
-
-/* CR1 register Mask */
-#define CR1_CLEAR_MASK								((uint32_t)0xFCFFFEFF)
-
-/* CR2 register Mask */
-#define CR2_CLEAR_MASK								((uint32_t)0xC0FFF7FD)
-
-/* ADC L Mask */
-#define SQR1_L_RESET								((uint32_t)0xFF0FFFFF) 
-
-/* ADC_resolution */ 
-#define ADC_Resolution_12b							((uint32_t)0x00000000)
-
-/* ADC_external_trigger_edge_for_regular_channels_conversion */
-#define ADC_ExternalTrigConvEdge_None				((uint32_t)0x00000000)
-
-/* ADC_extrenal_trigger_sources_for_regular_channels_conversion */ 
-#define ADC_ExternalTrigConv_T1_CC1					((uint32_t)0x00000000)
-
-/* ADC_data_align */ 
-#define ADC_DataAlign_Right							((uint32_t)0x00000000)
-
-/* RCC_APB2_Peripherals */ 
-#define RCC_APB2Periph_ADC							((uint32_t)0x00000100)
-
-/* ADC_channels */ 
-#define ADC_Channel_8								((uint8_t)0x08)
-
-/* ADC_sampling_times */ 
-#define ADC_SampleTime_3Cycles						((uint8_t)0x00)
-
-/* ADC SMPx mask */  
-#define SMPR2_SMP_SET								((uint32_t)0x00000007) 
-
-/* ADC SQx mask */
-#define SQR3_SQ_SET									((uint32_t)0x0000001F)
-
-unsigned int adcval;
-
-/* RCC_APB1_Peripherals */ 
-#define RCC_APB1Periph_TIM4              ((uint32_t)0x00000004)
-
-/** 
-  * @brief  TIM Time Base Init structure definition  
-  * @note   This structure is used with all TIMx except for TIM6 and TIM7.  
-  */
-typedef struct
-{
-  uint16_t TIM_Prescaler;         /*!< Specifies the prescaler value used to divide the TIM clock.
-                                       This parameter can be a number between 0x0000 and 0xFFFF */
-
-  uint16_t TIM_CounterMode;       /*!< Specifies the counter mode.
-                                       This parameter can be a value of @ref TIM_Counter_Mode */
-
-  uint32_t TIM_Period;            /*!< Specifies the period value to be loaded into the active
-                                       Auto-Reload Register at the next update event.
-                                       This parameter must be a number between 0x0000 and 0xFFFF.  */ 
-
-  uint16_t TIM_ClockDivision;     /*!< Specifies the clock division.
-                                      This parameter can be a value of @ref TIM_Clock_Division_CKD */
-
-  uint8_t TIM_RepetitionCounter;  /*!< Specifies the repetition counter value. Each time the RCR downcounter
-                                       reaches zero, an update event is generated and counting restarts
-                                       from the RCR value (N).
-                                       This means in PWM mode that (N+1) corresponds to:
-                                          - the number of PWM periods in edge-aligned mode
-                                          - the number of half PWM period in center-aligned mode
-                                       This parameter must be a number between 0x00 and 0xFF. 
-                                       @note This parameter is valid only for TIM1 and TIM8. */
-} TIM_TimeBaseInitTypeDef;
-
-/** 
-  * @brief  NVIC Init Structure definition  
-  */
-typedef struct
-{
-  uint8_t NVIC_IRQChannel;                    /*!< Specifies the IRQ channel to be enabled or disabled.
-                                                   This parameter can be an enumerator of @ref IRQn_Type 
-                                                   enumeration (For the complete STM32 Devices IRQ Channels
-                                                   list, please refer to stm32f4xx.h file) */
-
-  uint8_t NVIC_IRQChannelPreemptionPriority;  /*!< Specifies the pre-emption priority for the IRQ channel
-                                                   specified in NVIC_IRQChannel. This parameter can be a value
-                                                   between 0 and 15 as described in the table @ref MISC_NVIC_Priority_Table
-                                                   A lower priority value indicates a higher priority */
-
-  uint8_t NVIC_IRQChannelSubPriority;         /*!< Specifies the subpriority level for the IRQ channel specified
-                                                   in NVIC_IRQChannel. This parameter can be a value
-                                                   between 0 and 15 as described in the table @ref MISC_NVIC_Priority_Table
-                                                   A lower priority value indicates a higher priority */
-
-  FunctionalState NVIC_IRQChannelCmd;         /*!< Specifies whether the IRQ channel defined in NVIC_IRQChannel
-                                                   will be enabled or disabled. 
-                                                   This parameter can be set either to ENABLE or DISABLE */   
-} NVIC_InitTypeDef;
-
-/* TIM_Counter_Mode */
-#define TIM_CounterMode_Up                 ((uint16_t)0x0000)
-
-/* TIM_Clock_Division_CKD */
-#define TIM_CKD_DIV1                       ((uint16_t)0x0000)
-
-/* TIM_interrupt_sources */
-#define TIM_IT_Update                      ((uint16_t)0x0001)
-
-/* TIM_Prescaler_Reload_Mode */
-#define TIM_PSCReloadMode_Immediate        ((uint16_t)0x0001)
+#include "adc71.h"
 
 /**
   * @brief  Initializes the NVIC peripheral according to the specified
   *         parameters in the NVIC_InitStruct.
-  * @note   To configure interrupts priority correctly, the NVIC_PriorityGroupConfig()
-  *         function should be called before. 
   * @param  NVIC_InitStruct: pointer to a NVIC_InitTypeDef structure that contains
   *         the configuration information for the specified NVIC peripheral.
   * @retval None
@@ -170,30 +43,6 @@ void NVIC_Init(NVIC_InitTypeDef* NVIC_InitStruct)
   *         is disabled and the application software has to enable this clock before 
   *         using it. 
   * @param  RCC_APB1Periph: specifies the APB1 peripheral to gates its clock.
-  *          This parameter can be any combination of the following values:
-  *            @arg RCC_APB1Periph_TIM2:   TIM2 clock
-  *            @arg RCC_APB1Periph_TIM3:   TIM3 clock
-  *            @arg RCC_APB1Periph_TIM4:   TIM4 clock
-  *            @arg RCC_APB1Periph_TIM5:   TIM5 clock
-  *            @arg RCC_APB1Periph_TIM6:   TIM6 clock
-  *            @arg RCC_APB1Periph_TIM7:   TIM7 clock
-  *            @arg RCC_APB1Periph_TIM12:  TIM12 clock
-  *            @arg RCC_APB1Periph_TIM13:  TIM13 clock
-  *            @arg RCC_APB1Periph_TIM14:  TIM14 clock
-  *            @arg RCC_APB1Periph_WWDG:   WWDG clock
-  *            @arg RCC_APB1Periph_SPI2:   SPI2 clock
-  *            @arg RCC_APB1Periph_SPI3:   SPI3 clock
-  *            @arg RCC_APB1Periph_USART2: USART2 clock
-  *            @arg RCC_APB1Periph_USART3: USART3 clock
-  *            @arg RCC_APB1Periph_UART4:  UART4 clock
-  *            @arg RCC_APB1Periph_UART5:  UART5 clock
-  *            @arg RCC_APB1Periph_I2C1:   I2C1 clock
-  *            @arg RCC_APB1Periph_I2C2:   I2C2 clock
-  *            @arg RCC_APB1Periph_I2C3:   I2C3 clock
-  *            @arg RCC_APB1Periph_CAN1:   CAN1 clock
-  *            @arg RCC_APB1Periph_CAN2:   CAN2 clock
-  *            @arg RCC_APB1Periph_PWR:    PWR clock
-  *            @arg RCC_APB1Periph_DAC:    DAC clock
   * @param  NewState: new state of the specified peripheral clock.
   *          This parameter can be: ENABLE or DISABLE.
   * @retval None
@@ -288,20 +137,7 @@ void EnableTimerInterrupt()
 /**
   * @brief  Checks whether the TIM interrupt has occurred or not.
   * @param  TIMx: where x can be 1 to 14 to select the TIM peripheral.
-  * @param  TIM_IT: specifies the TIM interrupt source to check.
-  *          This parameter can be one of the following values:
-  *            @arg TIM_IT_Update: TIM update Interrupt source
-  *            @arg TIM_IT_CC1: TIM Capture Compare 1 Interrupt source
-  *            @arg TIM_IT_CC2: TIM Capture Compare 2 Interrupt source
-  *            @arg TIM_IT_CC3: TIM Capture Compare 3 Interrupt source
-  *            @arg TIM_IT_CC4: TIM Capture Compare 4 Interrupt source
-  *            @arg TIM_IT_COM: TIM Commutation Interrupt source
-  *            @arg TIM_IT_Trigger: TIM Trigger Interrupt source
-  *            @arg TIM_IT_Break: TIM Break Interrupt source
-  *
-  * @note   TIM6 and TIM7 can generate only an update interrupt.
-  * @note   TIM_IT_COM and TIM_IT_Break are used only with TIM1 and TIM8.
-  *     
+  * @param  TIM_IT: specifies the TIM interrupt source to check.  
   * @retval The new state of the TIM_IT(SET or RESET).
   */
 ITStatus TIM_GetITStatus(TIM_TypeDef* TIMx, uint16_t TIM_IT)
@@ -323,54 +159,12 @@ ITStatus TIM_GetITStatus(TIM_TypeDef* TIMx, uint16_t TIM_IT)
   return bitstatus;
 }
 
-typedef struct
-{
-  uint32_t ADC_Resolution;                /*!< Configures the ADC resolution dual mode. 
-                                               This parameter can be a value of @ref ADC_resolution */                                   
-  FunctionalState ADC_ScanConvMode;       /*!< Specifies whether the conversion 
-                                               is performed in Scan (multichannels) 
-                                               or Single (one channel) mode.
-                                               This parameter can be set to ENABLE or DISABLE */ 
-  FunctionalState ADC_ContinuousConvMode; /*!< Specifies whether the conversion 
-                                               is performed in Continuous or Single mode.
-                                               This parameter can be set to ENABLE or DISABLE. */
-  uint32_t ADC_ExternalTrigConvEdge;      /*!< Select the external trigger edge and
-                                               enable the trigger of a regular group. 
-                                               This parameter can be a value of 
-                                               @ref ADC_external_trigger_edge_for_regular_channels_conversion */
-  uint32_t ADC_ExternalTrigConv;          /*!< Select the external event used to trigger 
-                                               the start of conversion of a regular group.
-                                               This parameter can be a value of 
-                                               @ref ADC_extrenal_trigger_sources_for_regular_channels_conversion */
-  uint32_t ADC_DataAlign;                 /*!< Specifies whether the ADC data  alignment
-                                               is left or right. This parameter can be 
-                                               a value of @ref ADC_data_align */
-  uint8_t  ADC_NbrOfConversion;           /*!< Specifies the number of ADC conversions
-                                               that will be done using the sequencer for
-                                               regular channel group.
-                                               This parameter must range from 1 to 16. */
-}ADC_InitTypeDef;
-
 /**
   * @brief  Enables or disables the High Speed APB (APB2) peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before 
   *         using it.
   * @param  RCC_APB2Periph: specifies the APB2 peripheral to gates its clock.
-  *          This parameter can be any combination of the following values:
-  *            @arg RCC_APB2Periph_TIM1:   TIM1 clock
-  *            @arg RCC_APB2Periph_TIM8:   TIM8 clock
-  *            @arg RCC_APB2Periph_USART1: USART1 clock
-  *            @arg RCC_APB2Periph_USART6: USART6 clock
-  *            @arg RCC_APB2Periph_ADC1:   ADC1 clock
-  *            @arg RCC_APB2Periph_ADC2:   ADC2 clock
-  *            @arg RCC_APB2Periph_ADC3:   ADC3 clock
-  *            @arg RCC_APB2Periph_SDIO:   SDIO clock
-  *            @arg RCC_APB2Periph_SPI1:   SPI1 clock
-  *            @arg RCC_APB2Periph_SYSCFG: SYSCFG clock
-  *            @arg RCC_APB2Periph_TIM9:   TIM9 clock
-  *            @arg RCC_APB2Periph_TIM10:  TIM10 clock
-  *            @arg RCC_APB2Periph_TIM11:  TIM11 clock
   * @param  NewState: new state of the specified peripheral clock.
   *          This parameter can be: ENABLE or DISABLE.
   * @retval None
@@ -414,20 +208,6 @@ void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 /**
   * @brief  Forces or releases High Speed APB (APB2) peripheral reset.
   * @param  RCC_APB2Periph: specifies the APB2 peripheral to reset.
-  *          This parameter can be any combination of the following values:
-  *            @arg RCC_APB2Periph_TIM1:   TIM1 clock
-  *            @arg RCC_APB2Periph_TIM8:   TIM8 clock
-  *            @arg RCC_APB2Periph_USART1: USART1 clock
-  *            @arg RCC_APB2Periph_USART6: USART6 clock
-  *            @arg RCC_APB2Periph_ADC1:   ADC1 clock
-  *            @arg RCC_APB2Periph_ADC2:   ADC2 clock
-  *            @arg RCC_APB2Periph_ADC3:   ADC3 clock
-  *            @arg RCC_APB2Periph_SDIO:   SDIO clock
-  *            @arg RCC_APB2Periph_SPI1:   SPI1 clock
-  *            @arg RCC_APB2Periph_SYSCFG: SYSCFG clock
-  *            @arg RCC_APB2Periph_TIM9:   TIM9 clock
-  *            @arg RCC_APB2Periph_TIM10:  TIM10 clock
-  *            @arg RCC_APB2Periph_TIM11:  TIM11 clock
   * @param  NewState: new state of the specified peripheral reset.
   *          This parameter can be: ENABLE or DISABLE.
   * @retval None
@@ -463,12 +243,7 @@ void ADC_DeInit(void)
 
 /**
   * @brief  Initializes the ADCx peripheral according to the specified parameters 
-  *         in the ADC_InitStruct.
-  * @note   This function is used to configure the global features of the ADC ( 
-  *         Resolution and Data Alignment), however, the rest of the configuration
-  *         parameters are specific to the regular channels group (scan mode 
-  *         activation, continuous mode activation, External trigger source and 
-  *         edge, number of conversion in the regular channels group sequencer).  
+  *         in the ADC_InitStruct.  
   * @param  ADCx: where x can be 1, 2 or 3 to select the ADC peripheral.
   * @param  ADC_InitStruct: pointer to an ADC_InitTypeDef structure that contains
   *         the configuration information for the specified ADC peripheral.
@@ -533,39 +308,10 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
   * @brief  Configures for the selected ADC regular channel its corresponding
   *         rank in the sequencer and its sample time.
   * @param  ADCx: where x can be 1, 2 or 3 to select the ADC peripheral.
-  * @param  ADC_Channel: the ADC channel to configure. 
-  *          This parameter can be one of the following values:
-  *            @arg ADC_Channel_0: ADC Channel0 selected
-  *            @arg ADC_Channel_1: ADC Channel1 selected
-  *            @arg ADC_Channel_2: ADC Channel2 selected
-  *            @arg ADC_Channel_3: ADC Channel3 selected
-  *            @arg ADC_Channel_4: ADC Channel4 selected
-  *            @arg ADC_Channel_5: ADC Channel5 selected
-  *            @arg ADC_Channel_6: ADC Channel6 selected
-  *            @arg ADC_Channel_7: ADC Channel7 selected
-  *            @arg ADC_Channel_8: ADC Channel8 selected
-  *            @arg ADC_Channel_9: ADC Channel9 selected
-  *            @arg ADC_Channel_10: ADC Channel10 selected
-  *            @arg ADC_Channel_11: ADC Channel11 selected
-  *            @arg ADC_Channel_12: ADC Channel12 selected
-  *            @arg ADC_Channel_13: ADC Channel13 selected
-  *            @arg ADC_Channel_14: ADC Channel14 selected
-  *            @arg ADC_Channel_15: ADC Channel15 selected
-  *            @arg ADC_Channel_16: ADC Channel16 selected
-  *            @arg ADC_Channel_17: ADC Channel17 selected
-  *            @arg ADC_Channel_18: ADC Channel18 selected                       
+  * @param  ADC_Channel: the ADC channel to configure.                       
   * @param  Rank: The rank in the regular group sequencer.
   *          This parameter must be between 1 to 16.
-  * @param  ADC_SampleTime: The sample time value to be set for the selected channel. 
-  *          This parameter can be one of the following values:
-  *            @arg ADC_SampleTime_3Cycles: Sample time equal to 3 cycles
-  *            @arg ADC_SampleTime_15Cycles: Sample time equal to 15 cycles
-  *            @arg ADC_SampleTime_28Cycles: Sample time equal to 28 cycles
-  *            @arg ADC_SampleTime_56Cycles: Sample time equal to 56 cycles	
-  *            @arg ADC_SampleTime_84Cycles: Sample time equal to 84 cycles	
-  *            @arg ADC_SampleTime_112Cycles: Sample time equal to 112 cycles	
-  *            @arg ADC_SampleTime_144Cycles: Sample time equal to 144 cycles	
-  *            @arg ADC_SampleTime_480Cycles: Sample time equal to 480 cycles	
+  * @param  ADC_SampleTime: The sample time value to be set for the selected channel. 	
   * @retval None
   */
 void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Rank, uint8_t ADC_SampleTime)
@@ -633,7 +379,7 @@ void handleADC()
 {
 	/* Run acquisition */
 	adcval = ADC_SingleAcquisition();
-
+#ifdef DEBUG
 	if (adcval < 300)
 	{
 		ledGreen::high();
@@ -662,6 +408,7 @@ void handleADC()
 		ledRed::low();
 		ledBlue::high();		
 	}
+#endif
 }
 
 void InitializeBoard()
@@ -690,12 +437,13 @@ void InitializeBoard()
 	ADC_Init(ADC1, &ADC_InitStructure);
 
 	ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
-
+#ifdef DEBUG
 	/* Inizialization of LED's GPIOs*/
 	ledGreen::mode(Mode::OUTPUT); ///Push Pull  Output    (MODE=01 TYPE=0 PUP=00)
 	ledOrange::mode(Mode::OUTPUT);
 	ledRed::mode(Mode::OUTPUT);	
 	ledBlue::mode(Mode::OUTPUT);
+#endif
 }
 
 int main()
