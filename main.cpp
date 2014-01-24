@@ -1,43 +1,6 @@
 #include "adc71.h"
 
 /**
-  * @brief  Initializes the NVIC peripheral according to the specified
-  *         parameters in the NVIC_InitStruct.
-  * @param  NVIC_InitStruct: pointer to a NVIC_InitTypeDef structure that contains
-  *         the configuration information for the specified NVIC peripheral.
-  * @retval None
-  */
-void NVIC_Init(NVIC_InitTypeDef* NVIC_InitStruct)
-{
-  uint8_t tmppriority = 0x00, tmppre = 0x00, tmpsub = 0x0F;
-    
-  if (NVIC_InitStruct->NVIC_IRQChannelCmd != DISABLE)
-  {
-    /* Compute the Corresponding IRQ Priority --------------------------------*/    
-    tmppriority = (0x700 - ((SCB->AIRCR) & (uint32_t)0x700))>> 0x08;
-    tmppre = (0x4 - tmppriority);
-    tmpsub = tmpsub >> tmppriority;
-
-    tmppriority = NVIC_InitStruct->NVIC_IRQChannelPreemptionPriority << tmppre;
-    tmppriority |=  (uint8_t)(NVIC_InitStruct->NVIC_IRQChannelSubPriority & tmpsub);
-        
-    tmppriority = tmppriority << 0x04;
-        
-    NVIC->IP[NVIC_InitStruct->NVIC_IRQChannel] = tmppriority;
-    
-    /* Enable the Selected IRQ Channels --------------------------------------*/
-    NVIC->ISER[NVIC_InitStruct->NVIC_IRQChannel >> 0x05] =
-      (uint32_t)0x01 << (NVIC_InitStruct->NVIC_IRQChannel & (uint8_t)0x1F);
-  }
-  else
-  {
-    /* Disable the Selected IRQ Channels -------------------------------------*/
-    NVIC->ICER[NVIC_InitStruct->NVIC_IRQChannel >> 0x05] =
-      (uint32_t)0x01 << (NVIC_InitStruct->NVIC_IRQChannel & (uint8_t)0x1F);
-  }
-}
-
-/**
   * @brief  Enables or disables the Low Speed APB (APB1) peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before 
@@ -105,33 +68,30 @@ void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseIn
 
   /* Generate an update event to reload the Prescaler 
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
-  TIMx->EGR = TIM_PSCReloadMode_Immediate;         
+  TIMx->EGR = TIM_EGR_UG;         
 }
 
 void InitializeTimer()
 {
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM4EN, ENABLE);
 
 	TIM_TimeBaseInitTypeDef timerInitStructure;
 	timerInitStructure.TIM_Prescaler = 84000 - 1; // 168000 MHz / 8400 = 2kHz
 	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	timerInitStructure.TIM_Period = 2 - 1; // 2 / 2kHz = 0,001 sec
-	timerInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	timerInitStructure.TIM_ClockDivision = TIM_CR1_CKD;
 	timerInitStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM4, &timerInitStructure);
 	TIM4->CR1 |= TIM_CR1_CEN;
 	/* Enable the Interrupt sources */
-	TIM4->DIER |= TIM_IT_Update;
+	TIM4->DIER |= TIM_DIER_UIE;
 }
 
 void EnableTimerInterrupt()
 {
-    NVIC_InitTypeDef nvicStructure;
-    nvicStructure.NVIC_IRQChannel = TIM4_IRQn;
-    nvicStructure.NVIC_IRQChannelPreemptionPriority = 0;
-    nvicStructure.NVIC_IRQChannelSubPriority = 1;
-    nvicStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&nvicStructure);
+    NVIC_SetPriority(TIM4_IRQn, (1<<__NVIC_PRIO_BITS) - 1);
+    NVIC_ClearPendingIRQ(TIM4_IRQn);
+    NVIC_EnableIRQ(TIM4_IRQn);
 }
 
 /**
@@ -224,8 +184,6 @@ void RCC_APB2PeriphResetCmd(uint32_t RCC_APB2Periph, FunctionalState NewState)
   }
 }
 
-
-
 /**
   * @brief  Deinitializes all ADCs peripherals registers to their default reset 
   *         values.
@@ -235,10 +193,10 @@ void RCC_APB2PeriphResetCmd(uint32_t RCC_APB2Periph, FunctionalState NewState)
 void ADC_DeInit(void)
 {
   /* Enable all ADCs reset state */
-  RCC_APB2PeriphResetCmd(RCC_APB2Periph_ADC, ENABLE);
+  RCC_APB2PeriphResetCmd(RCC_APB2ENR_ADC1EN, ENABLE);
   
   /* Release all ADCs from reset state */
-  RCC_APB2PeriphResetCmd(RCC_APB2Periph_ADC, DISABLE);
+  RCC_APB2PeriphResetCmd(RCC_APB2ENR_ADC1EN, DISABLE);
 }
 
 /**
@@ -323,7 +281,7 @@ void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Ra
     tmpreg1 = ADCx->SMPR2;
     
     /* Calculate the mask to clear */
-    tmpreg2 = SMPR2_SMP_SET << (3 * ADC_Channel);
+    tmpreg2 = ADC_SMPR2_SMP0 << (3 * ADC_Channel);
     
     /* Clear the old sample time */
     tmpreg1 &= ~tmpreg2;
@@ -341,7 +299,7 @@ void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Ra
     tmpreg1 = ADCx->SQR3;
     
     /* Calculate the mask to clear */
-    tmpreg2 = SQR3_SQ_SET << (5 * (Rank - 1));
+    tmpreg2 = ADC_SQR3_SQ1 << (5 * (Rank - 1));
     
     /* Clear the old SQx bits for the selected rank */
     tmpreg1 &= ~tmpreg2;
@@ -361,13 +319,13 @@ uint16_t ADC_SingleAcquisition()
 	uint16_t res;
 
 	/* ADCx regular channel x configuration */
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_3Cycles);
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
 
 	/* Enable ADCx conversion for regular group */ 
 	ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
 
 	/* Wait until ADCx end of conversion */ 
-  	while((ADC1->SR & ADC_SR_EOC) == 0);
+  while((ADC1->SR & ADC_SR_EOC) == 0);
 
 	/* Get ADCx conversion value */
 	res = (uint16_t)ADC1->DR;
@@ -421,7 +379,7 @@ void InitializeBoard()
 	adcGPIO::speed(Speed::_50MHz);
 
 	/* ADC1 Periph clock enable */
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2ENR_ADC1EN, ENABLE);
 
 	/* Reset ADC to default values */
 	ADC_DeInit();
@@ -451,7 +409,7 @@ int main()
 	InitializeBoard();
 	if (POLLING)
 	{
-		while (1) { delayMs(1); handleADC(); }
+		while (1) { handleADC(); }
 	}
 	else
 	{
@@ -465,10 +423,10 @@ int main()
 
 void TIM4_IRQHandler()
 {
-	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
+	if (TIM_GetITStatus(TIM4, TIM_SR_UIF) != RESET)
 	{
 		/* Clear the IT pending Bit */
-		TIM4->SR = (uint16_t)~TIM_IT_Update;
+		TIM4->SR = (uint16_t)~TIM_SR_UIF;
 		handleADC();
 	}
 }

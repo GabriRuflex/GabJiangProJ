@@ -5,11 +5,6 @@
 using namespace std;
 using namespace miosix;
 
-#define PERIPH_BASE                        ((uint32_t)0x40000000) /*Peripheral base address in the alias region*/
-#define APB2PERIPH_BASE                    (PERIPH_BASE + 0x00010000)
-#define ADC1_BASE                          (APB2PERIPH_BASE + 0x2000)
-#define ADC1                               ((ADC_TypeDef *) ADC1_BASE)
-
 #define POLLING                            0
 #define DEBUG
 
@@ -27,7 +22,8 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 /* CR2 register Mask */
 #define CR2_CLEAR_MASK                     ((uint32_t)0xC0FFF7FD)
 /* ADC L Mask */
-#define SQR1_L_RESET                       ((uint32_t)0xFF0FFFFF) 
+#define SQR1_L_RESET                       ((uint32_t)0xFF0FFFFF)
+ 
 /* ADC_resolution */ 
 #define ADC_Resolution_12b	               ((uint32_t)0x00000000)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
@@ -36,28 +32,13 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 #define ADC_ExternalTrigConv_T1_CC1        ((uint32_t)0x00000000)
 /* ADC_data_align */ 
 #define ADC_DataAlign_Right                ((uint32_t)0x00000000)
-/* RCC_APB2_Peripherals */ 
-#define RCC_APB2Periph_ADC                 ((uint32_t)0x00000100)
 /* ADC_channels */ 
 #define ADC_Channel_8                      ((uint8_t)0x08)
 /* ADC_sampling_times */ 
-#define ADC_SampleTime_3Cycles	           ((uint8_t)0x00)
-/* ADC SMPx mask */  
-#define SMPR2_SMP_SET		                 	 ((uint32_t)0x00000007) 
-/* ADC SQx mask */
-#define SQR3_SQ_SET			                   ((uint32_t)0x0000001F)
-/* RCC_APB1_Peripherals */ 
-#define RCC_APB1Periph_TIM4                ((uint32_t)0x00000004)
+#define ADC_SampleTime_480Cycles	           ((uint8_t)0x07)
 
-/*Timer definitions*/
 /* TIM_Counter_Mode */
 #define TIM_CounterMode_Up                 ((uint16_t)0x0000)
-/* TIM_Clock_Division_CKD */
-#define TIM_CKD_DIV1                       ((uint16_t)0x0000)
-/* TIM_interrupt_sources */
-#define TIM_IT_Update                      ((uint16_t)0x0001)
-/* TIM_Prescaler_Reload_Mode */
-#define TIM_PSCReloadMode_Immediate        ((uint16_t)0x0001)
 
 /** 
   * @brief  TIM Time Base Init structure definition  
@@ -82,28 +63,6 @@ typedef struct
                                           - the number of half PWM period in center-aligned mode
                                        This parameter must be a number between 0x00 and 0xFF. */
 } TIM_TimeBaseInitTypeDef;
-
-/** 
-  * @brief  NVIC Init Structure definition  
-  */
-typedef struct
-{
-  uint8_t NVIC_IRQChannel;                    /*!< Specifies the IRQ channel to be enabled or disabled.
-                                                   This parameter can be an enumerator of @ref IRQn_Type 
-                                                   enumeration (For the complete STM32 Devices IRQ Channels
-                                                   list, please refer to stm32f4xx.h file) */
-  uint8_t NVIC_IRQChannelPreemptionPriority;  /*!< Specifies the pre-emption priority for the IRQ channel
-                                                   specified in NVIC_IRQChannel. This parameter can be a value
-                                                   between 0 and 15 as described in the table @ref MISC_NVIC_Priority_Table
-                                                   A lower priority value indicates a higher priority */
-  uint8_t NVIC_IRQChannelSubPriority;         /*!< Specifies the subpriority level for the IRQ channel specified
-                                                   in NVIC_IRQChannel. This parameter can be a value
-                                                   between 0 and 15 as described in the table @ref MISC_NVIC_Priority_Table
-                                                   A lower priority value indicates a higher priority */
-  FunctionalState NVIC_IRQChannelCmd;         /*!< Specifies whether the IRQ channel defined in NVIC_IRQChannel
-                                                   will be enabled or disabled. 
-                                                   This parameter can be set either to ENABLE or DISABLE */   
-} NVIC_InitTypeDef;
 
 typedef struct
 {
