@@ -23,41 +23,41 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 #define CR2_CLEAR_MASK                     ((uint32_t)0xC0FFF7FD)
 /* ADC L Mask */
 #define SQR1_L_RESET                       ((uint32_t)0xFF0FFFFF)
- 
-/* ADC_resolution */ 
-#define ADC_Resolution_12b	               ((uint32_t)0x00000000)
+
+/* ADC_resolution */
+#define ADC_Resolution_12b                 ((uint32_t)0x00000000)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
 #define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00000000)
-/* ADC_extrenal_trigger_sources_for_regular_channels_conversion */ 
+/* ADC_extrenal_trigger_sources_for_regular_channels_conversion */
 #define ADC_ExternalTrigConv_T1_CC1        ((uint32_t)0x00000000)
-/* ADC_data_align */ 
+/* ADC_data_align */
 #define ADC_DataAlign_Right                ((uint32_t)0x00000000)
-/* ADC_channels */ 
+/* ADC_channels */
 #define ADC_Channel_8                      ((uint8_t)0x08)
-/* ADC_sampling_times */ 
-#define ADC_SampleTime_480Cycles	           ((uint8_t)0x07)
+/* ADC_sampling_times */
+#define ADC_SampleTime_480Cycles             ((uint8_t)0x07)
 
 typedef struct
 {
-  uint32_t ADC_Resolution;                /*!< Configures the ADC resolution dual mode. 
-                                               This parameter can be a value of @ref ADC_resolution */                                   
-  FunctionalState ADC_ScanConvMode;       /*!< Specifies whether the conversion 
-                                               is performed in Scan (multichannels) 
+  uint32_t ADC_Resolution;                /*!< Configures the ADC resolution dual mode.
+                                               This parameter can be a value of @ref ADC_resolution */
+  FunctionalState ADC_ScanConvMode;       /*!< Specifies whether the conversion
+                                               is performed in Scan (multichannels)
                                                or Single (one channel) mode.
-                                               This parameter can be set to ENABLE or DISABLE */ 
-  FunctionalState ADC_ContinuousConvMode; /*!< Specifies whether the conversion 
+                                               This parameter can be set to ENABLE or DISABLE */
+  FunctionalState ADC_ContinuousConvMode; /*!< Specifies whether the conversion
                                                is performed in Continuous or Single mode.
                                                This parameter can be set to ENABLE or DISABLE. */
   uint32_t ADC_ExternalTrigConvEdge;      /*!< Select the external trigger edge and
-                                               enable the trigger of a regular group. 
-                                               This parameter can be a value of 
+                                               enable the trigger of a regular group.
+                                               This parameter can be a value of
                                                @ref ADC_external_trigger_edge_for_regular_channels_conversion */
-  uint32_t ADC_ExternalTrigConv;          /*!< Select the external event used to trigger 
+  uint32_t ADC_ExternalTrigConv;          /*!< Select the external event used to trigger
                                                the start of conversion of a regular group.
-                                               This parameter can be a value of 
+                                               This parameter can be a value of
                                                @ref ADC_extrenal_trigger_sources_for_regular_channels_conversion */
   uint32_t ADC_DataAlign;                 /*!< Specifies whether the ADC data  alignment
-                                               is left or right. This parameter can be 
+                                               is left or right. This parameter can be
                                                a value of @ref ADC_data_align */
   uint8_t  ADC_NbrOfConversion;           /*!< Specifies the number of ADC conversions
                                                that will be done using the sequencer for
