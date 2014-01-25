@@ -1,143 +1,59 @@
 #include "adc71.h"
 
-/**
-  * @brief  Enables or disables the Low Speed APB (APB1) peripheral clock.
-  * @note   After reset, the peripheral clock (used for registers read/write access)
-  *         is disabled and the application software has to enable this clock before 
-  *         using it. 
-  * @param  RCC_APB1Periph: specifies the APB1 peripheral to gates its clock.
-  * @param  NewState: new state of the specified peripheral clock.
-  *          This parameter can be: ENABLE or DISABLE.
-  * @retval None
-  */
-void RCC_APB1PeriphClockCmd(uint32_t RCC_APB1Periph, FunctionalState NewState)
+void InitializeTimer()
 {
-  if (NewState != DISABLE)
-  {
-    RCC->APB1ENR |= RCC_APB1Periph;
-  }
-  else
-  {
-    RCC->APB1ENR &= ~RCC_APB1Periph;
-  }
-}
+  /* Enable the Low Speed APB (APB1) peripheral clock. */
+  RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
 
-/**
-  * @brief  Initializes the TIMx Time Base Unit peripheral according to 
-  *         the specified parameters in the TIM_TimeBaseInitStruct.
-  * @param  TIMx: where x can be  1 to 14 to select the TIM peripheral.
-  * @param  TIM_TimeBaseInitStruct: pointer to a TIM_TimeBaseInitTypeDef structure
-  *         that contains the configuration information for the specified TIM peripheral.
-  * @retval None
-  */
-void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseInitStruct)
-{
+  /* Configure the timer */
   uint16_t tmpcr1 = 0;
-
-  tmpcr1 = TIMx->CR1;  
-
-  if((TIMx == TIM1) || (TIMx == TIM8)||
-     (TIMx == TIM2) || (TIMx == TIM3)||
-     (TIMx == TIM4) || (TIMx == TIM5)) 
-  {
-    /* Select the Counter Mode */
-    tmpcr1 &= (uint16_t)(~(TIM_CR1_DIR | TIM_CR1_CMS));
-    tmpcr1 |= (uint32_t)TIM_TimeBaseInitStruct->TIM_CounterMode;
-  }
+  tmpcr1 = TIM4->CR1;
+  
+  /* Select the Counter Mode */
+  tmpcr1 &= (uint16_t)(~(TIM_CR1_DIR | TIM_CR1_CMS)); //Set CMS to 00 (Edge-aligned mode) and DIR to 0 (Upcounter)
+  //tmpcr1 |= (uint32_t)0x0000;
  
-  if((TIMx != TIM6) && (TIMx != TIM7))
-  {
-    /* Set the clock division */
-    tmpcr1 &=  (uint16_t)(~TIM_CR1_CKD);
-    tmpcr1 |= (uint32_t)TIM_TimeBaseInitStruct->TIM_ClockDivision;
-  }
+  /* Set the clock division */
+  tmpcr1 &=  (uint16_t)(~TIM_CR1_CKD); //Set CKD to 00 (timer clock = sampling clock used by the digital filters)
+  //tmpcr1 |= (uint32_t)0x0000;
 
-  TIMx->CR1 = tmpcr1;
+  TIM4->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIMx->ARR = TIM_TimeBaseInitStruct->TIM_Period ;
+  TIM4->ARR = 2 - 1 ; // 2 / 2kHz = 0,001 sec
  
   /* Set the Prescaler value */
-  TIMx->PSC = TIM_TimeBaseInitStruct->TIM_Prescaler;
-    
-  if ((TIMx == TIM1) || (TIMx == TIM8))  
-  {
-    /* Set the Repetition Counter value */
-    TIMx->RCR = TIM_TimeBaseInitStruct->TIM_RepetitionCounter;
-  }
+  TIM4->PSC = 8400 - 1; // 168000 MHz / 8400 = 2kHz
 
   /* Generate an update event to reload the Prescaler 
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
-  TIMx->EGR = TIM_EGR_UG;         
-}
-
-void InitializeTimer()
-{
-	RCC_APB1PeriphClockCmd(RCC_APB1ENR_TIM4EN, ENABLE);
-
-	TIM_TimeBaseInitTypeDef timerInitStructure;
-	timerInitStructure.TIM_Prescaler = 84000 - 1; // 168000 MHz / 8400 = 2kHz
-	timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	timerInitStructure.TIM_Period = 2 - 1; // 2 / 2kHz = 0,001 sec
-	timerInitStructure.TIM_ClockDivision = TIM_CR1_CKD;
-	timerInitStructure.TIM_RepetitionCounter = 0;
-	TIM_TimeBaseInit(TIM4, &timerInitStructure);
+  TIM4->EGR = TIM_EGR_UG;
+	
+  /* Enable the Counter */
 	TIM4->CR1 |= TIM_CR1_CEN;
 	/* Enable the Interrupt sources */
 	TIM4->DIER |= TIM_DIER_UIE;
+
+  /* Enable Timer4 interrupt */
+  NVIC_SetPriority(TIM4_IRQn, (1<<__NVIC_PRIO_BITS) - 1); //Set the lowest priority to TIM4 Interrupts
+  NVIC_ClearPendingIRQ(TIM4_IRQn);
+  NVIC_EnableIRQ(TIM4_IRQn);
 }
 
-void EnableTimerInterrupt()
+void TIM4_IRQHandler()
 {
-    NVIC_SetPriority(TIM4_IRQn, (1<<__NVIC_PRIO_BITS) - 1);
-    NVIC_ClearPendingIRQ(TIM4_IRQn);
-    NVIC_EnableIRQ(TIM4_IRQn);
-}
-
-/**
-  * @brief  Checks whether the TIM interrupt has occurred or not.
-  * @param  TIMx: where x can be 1 to 14 to select the TIM peripheral.
-  * @param  TIM_IT: specifies the TIM interrupt source to check.  
-  * @retval The new state of the TIM_IT(SET or RESET).
-  */
-ITStatus TIM_GetITStatus(TIM_TypeDef* TIMx, uint16_t TIM_IT)
-{
-  ITStatus bitstatus = RESET;  
   uint16_t itstatus = 0x0, itenable = 0x0;
-   
-  itstatus = TIMx->SR & TIM_IT;
-  
-  itenable = TIMx->DIER & TIM_IT;
+
+  /* Check interrupt status */
+  itstatus = TIM4->SR & TIM_SR_UIF;
+  /* Check interrupt enabled */
+  itenable = TIM4->DIER & TIM_DIER_UIE;
+
   if ((itstatus != (uint16_t)RESET) && (itenable != (uint16_t)RESET))
   {
-    bitstatus = SET;
-  }
-  else
-  {
-    bitstatus = RESET;
-  }
-  return bitstatus;
-}
-
-/**
-  * @brief  Enables or disables the High Speed APB (APB2) peripheral clock.
-  * @note   After reset, the peripheral clock (used for registers read/write access)
-  *         is disabled and the application software has to enable this clock before 
-  *         using it.
-  * @param  RCC_APB2Periph: specifies the APB2 peripheral to gates its clock.
-  * @param  NewState: new state of the specified peripheral clock.
-  *          This parameter can be: ENABLE or DISABLE.
-  * @retval None
-  */
-void RCC_APB2PeriphClockCmd(uint32_t RCC_APB2Periph, FunctionalState NewState)
-{
-  if (NewState != DISABLE)
-  {
-    RCC->APB2ENR |= RCC_APB2Periph;
-  }
-  else
-  {
-    RCC->APB2ENR &= ~RCC_APB2Periph;
+		/* Clear the IT pending Bit */
+		TIM4->SR = (uint16_t)~TIM_SR_UIF;
+		handleADC();
   }
 }
 
@@ -166,25 +82,6 @@ void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 }
 
 /**
-  * @brief  Forces or releases High Speed APB (APB2) peripheral reset.
-  * @param  RCC_APB2Periph: specifies the APB2 peripheral to reset.
-  * @param  NewState: new state of the specified peripheral reset.
-  *          This parameter can be: ENABLE or DISABLE.
-  * @retval None
-  */
-void RCC_APB2PeriphResetCmd(uint32_t RCC_APB2Periph, FunctionalState NewState)
-{
-  if (NewState != DISABLE)
-  {
-    RCC->APB2RSTR |= RCC_APB2Periph;
-  }
-  else
-  {
-    RCC->APB2RSTR &= ~RCC_APB2Periph;
-  }
-}
-
-/**
   * @brief  Deinitializes all ADCs peripherals registers to their default reset 
   *         values.
   * @param  None
@@ -193,10 +90,10 @@ void RCC_APB2PeriphResetCmd(uint32_t RCC_APB2Periph, FunctionalState NewState)
 void ADC_DeInit(void)
 {
   /* Enable all ADCs reset state */
-  RCC_APB2PeriphResetCmd(RCC_APB2ENR_ADC1EN, ENABLE);
+  RCC->APB2RSTR |= RCC_APB2ENR_ADC1EN;
   
   /* Release all ADCs from reset state */
-  RCC_APB2PeriphResetCmd(RCC_APB2ENR_ADC1EN, DISABLE);
+  RCC->APB2RSTR &= ~RCC_APB2ENR_ADC1EN;
 }
 
 /**
@@ -318,10 +215,10 @@ uint16_t ADC_SingleAcquisition()
 {
 	uint16_t res;
 
-	/* ADCx regular channel x configuration */
+	/* ADCx regular channel 8 configuration */
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
 
-	/* Enable ADCx conversion for regular group */ 
+	/* Enable ADC1 conversion for regular group */
 	ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
 
 	/* Wait until ADCx end of conversion */ 
@@ -337,6 +234,7 @@ void handleADC()
 {
 	/* Run acquisition */
 	adcval = ADC_SingleAcquisition();
+
 #ifdef DEBUG
 	if (adcval < 300)
 	{
@@ -379,7 +277,7 @@ void InitializeBoard()
 	adcGPIO::speed(Speed::_50MHz);
 
 	/* ADC1 Periph clock enable */
-	RCC_APB2PeriphClockCmd(RCC_APB2ENR_ADC1EN, ENABLE);
+  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
 
 	/* Reset ADC to default values */
 	ADC_DeInit();
@@ -395,6 +293,7 @@ void InitializeBoard()
 	ADC_Init(ADC1, &ADC_InitStructure);
 
 	ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
+
 #ifdef DEBUG
 	/* Inizialization of LED's GPIOs*/
 	ledGreen::mode(Mode::OUTPUT); ///Push Pull  Output    (MODE=01 TYPE=0 PUP=00)
@@ -414,19 +313,8 @@ int main()
 	else
 	{
 		InitializeTimer();
-		EnableTimerInterrupt();
 		while(1);
 	}
 
 	return 0;
-}
-
-void TIM4_IRQHandler()
-{
-	if (TIM_GetITStatus(TIM4, TIM_SR_UIF) != RESET)
-	{
-		/* Clear the IT pending Bit */
-		TIM4->SR = (uint16_t)~TIM_SR_UIF;
-		handleADC();
-	}
 }
