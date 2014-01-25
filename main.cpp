@@ -20,10 +20,10 @@ void InitializeTimer()
   TIM4->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIM4->ARR = 10 - 1 ; // 1 msec
+  TIM4->ARR = 2 - 1 ; // 0.000001 msec 21 MHz
 
   /* Set the Prescaler value */
-  TIM4->PSC = 8400 - 1; // 84000 kHz / 8400 = 10kHz
+  TIM4->PSC = 2 - 1; // 84000 kHz / 2 = 42 MHz
 
   /* Generate an update event to reload the Prescaler
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
@@ -194,46 +194,48 @@ void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Ra
   ADCx->SQR3 = tmpreg1;
 }
 
-uint16_t ADC_SingleAcquisition()
-{
-  uint16_t res;
-
-  /* ADCx regular channel 8 configuration */
-  ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
-
-  /* Enable ADC1 conversion for regular group */
-  ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
-
-  /* Wait until ADCx end of conversion */
-  while((ADC1->SR & ADC_SR_EOC) == 0);
-
-  /* Get ADCx conversion value */
-  res = (uint16_t)ADC1->DR;
-
-  return res;
-}
-
 void checkEnvrionment()
 {
-  printf("Max: %u Min: %u", max, min);
+  //printf("Max: %u Min: %u", maxval, minval);
 }
 
 void handleADC()
 {
   /* Run acquisition */
-  adcval = ADC_SingleAcquisition();
-  if (values == 1000) {
-    checkEnvrionment();
-    values = 0;
-    min = max = adcval;
+  adcval = (uint16_t)ADC1->DR;
+  if (values == NVAL) {
+    //checkEnvrionment();
+    freq = tmin = tmax = values = 0;
+    int midval = ((maxval + minval)/2);
+    diffAbs = maxval - midval;
+    diffPerc = (double)(maxval - midval) / midval;
+    minval = maxval = midval;
   }
 
-  buffer[values] = adcval;
-  max = (adcval > max) ? adcval : max;
-  min = (adcval < min) ? adcval : min;
-  printf("ok");
+  if (adcval > maxval) {
+    maxval = adcval;
+    minval = maxval;
+    double period = (double)1/NVAL;
+    double interval = (double)(tmin - tmax) * period;
+    if (tmin > tmax) {
+      freq = (double)1/interval;
+    }
+    tmax = values;
+  }
+  else if (adcval < minval) {
+    minval = adcval;
+    maxval = minval;
+    double period = (double)1/NVAL;
+    double interval = (double)(tmax - tmin) * period;
+    if (tmax > tmin) {
+      freq = (double)1/interval;
+    }
+    tmin = values;
+  }
+
   values++;
-  printf("%u",max);
+
+  //printf("%u",maxval);
 #ifdef DEBUG
   if (adcval < 300)
   {
@@ -273,7 +275,7 @@ void InitializeBoard()
 
   /* Inizialization of ADC's GPIO */
   adcGPIO::mode(Mode::INPUT_ANALOG); ///Floating Input       (MODE=11 TYPE=0 PUP=00)
-  adcGPIO::speed(Speed::_50MHz);
+  adcGPIO::speed(Speed::_100MHz);
 
   /* ADC1 Periph clock enable */
   RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
@@ -293,17 +295,28 @@ void InitializeBoard()
 
   ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
 
+  /* Enable ADC1 interrupt */
+  NVIC_SetPriority(ADC_IRQn, (1<<__NVIC_PRIO_BITS) - 1); //Set the lowest priority to ADC1 Interrupts
+  NVIC_ClearPendingIRQ(ADC_IRQn);
+  NVIC_EnableIRQ(ADC_IRQn);
+
 #ifdef DEBUG
   /* Inizialization of LED's GPIOs*/
   ledGreen::mode(Mode::OUTPUT); ///Push Pull  Output    (MODE=01 TYPE=0 PUP=00)
   ledOrange::mode(Mode::OUTPUT);
   ledRed::mode(Mode::OUTPUT);
   ledBlue::mode(Mode::OUTPUT);
+
+  ledGreen::speed(Speed::_100MHz);
+  ledOrange::speed(Speed::_100MHz);
+  ledRed::speed(Speed::_100MHz);
+  ledBlue::speed(Speed::_100MHz);
 #endif
 }
 
 int main()
 {
+	tmin=tmax=values = 0;
   InitializeBoard();
   if (POLLING)
   {
@@ -316,6 +329,31 @@ int main()
   }
 
   return 0;
+}
+
+void ADC_IRQHandler()
+{
+handleADC();
+  /* Check the status of the EOC ADC interrupt */
+  if (((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE))
+  {
+    /* Clear the selected ADC interrupt pending bits */
+    ADC1->SR = ~(uint32_t)ADC_SR_EOC;
+    /* Clear the selected ADC interrupt pending bits */
+    ADC1->SR = ~(uint32_t)ADC_SR_AWD;
+
+
+  }
+
+	//unsigned int status=USART2->SR; //Read status of usart peripheral
+	//char c=USART2->DR;              //Read possibly received char
+	//if(status & USART_SR_RXNE)      //Did we receive a char?
+	//{
+	//	if(numchar==bufsize) return; //Buffer empty
+	//	rxbuffer[putpos]=c;
+	//	if(++putpos >= bufsize) putpos=0;
+	//	numchar++;
+	//}
 }
 
 void TIM4_IRQHandler()
@@ -331,6 +369,11 @@ void TIM4_IRQHandler()
   {
     /* Clear the IT pending Bit */
     TIM4->SR = (uint16_t)~TIM_SR_UIF;
-    handleADC();
+
+    /* ADCx regular channel 8 configuration */
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+
+    /* Enable ADC1 conversion for regular group */
+    ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
   }
 }
