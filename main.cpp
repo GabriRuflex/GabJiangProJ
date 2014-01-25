@@ -40,23 +40,6 @@ void InitializeTimer()
   NVIC_EnableIRQ(TIM4_IRQn);
 }
 
-void TIM4_IRQHandler()
-{
-  uint16_t itstatus = 0x0, itenable = 0x0;
-
-  /* Check interrupt status */
-  itstatus = TIM4->SR & TIM_SR_UIF;
-  /* Check interrupt enabled */
-  itenable = TIM4->DIER & TIM_DIER_UIE;
-
-  if ((itstatus != (uint16_t)RESET) && (itenable != (uint16_t)RESET))
-  {
-		/* Clear the IT pending Bit */
-		TIM4->SR = (uint16_t)~TIM_SR_UIF;
-		handleADC();
-  }
-}
-
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 {
   /* Initialize the ADC_Mode member */
@@ -317,4 +300,21 @@ int main()
 	}
 
 	return 0;
+}
+
+void TIM4_IRQHandler()
+{
+  uint16_t itstatus = 0x0, itenable = 0x0;
+
+  /* Check interrupt status */
+  itstatus = TIM4->SR & TIM_SR_UIF;
+  /* Check interrupt enabled */
+  itenable = TIM4->DIER & TIM_DIER_UIE;
+
+  if ((itstatus != (uint16_t)RESET) && (itenable != (uint16_t)RESET))
+  {
+    /* Clear the IT pending Bit */
+    TIM4->SR = (uint16_t)~TIM_SR_UIF;
+    handleADC();
+  }
 }
