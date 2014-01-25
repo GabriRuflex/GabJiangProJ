@@ -20,10 +20,10 @@ void InitializeTimer()
   TIM4->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIM4->ARR = 2 - 1 ; // 2 / 2kHz = 0,001 sec
+  TIM4->ARR = 10 - 1 ; // 1 msec
 
   /* Set the Prescaler value */
-  TIM4->PSC = 8400 - 1; // 168000 MHz / 8400 = 2kHz
+  TIM4->PSC = 8400 - 1; // 84000 kHz / 8400 = 10kHz
 
   /* Generate an update event to reload the Prescaler
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
@@ -34,7 +34,7 @@ void InitializeTimer()
   /* Enable the Interrupt sources */
   TIM4->DIER |= TIM_DIER_UIE;
 
-  /* Enable Timer4 interrupt */
+  /* Enable TIM4 interrupt */
   NVIC_SetPriority(TIM4_IRQn, (1<<__NVIC_PRIO_BITS) - 1); //Set the lowest priority to TIM4 Interrupts
   NVIC_ClearPendingIRQ(TIM4_IRQn);
   NVIC_EnableIRQ(TIM4_IRQn);
@@ -213,11 +213,27 @@ uint16_t ADC_SingleAcquisition()
   return res;
 }
 
+void checkEnvrionment()
+{
+  printf("Max: %u Min: %u", max, min);
+}
+
 void handleADC()
 {
   /* Run acquisition */
   adcval = ADC_SingleAcquisition();
+  if (values == 1000) {
+    checkEnvrionment();
+    values = 0;
+    min = max = adcval;
+  }
 
+  buffer[values] = adcval;
+  max = (adcval > max) ? adcval : max;
+  min = (adcval < min) ? adcval : min;
+  printf("ok");
+  values++;
+  printf("%u",max);
 #ifdef DEBUG
   if (adcval < 300)
   {

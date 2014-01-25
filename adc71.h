@@ -65,4 +65,5 @@ typedef struct
                                                This parameter must range from 1 to 16. */
 }ADC_InitTypeDef;
 
-unsigned int adcval;
+unsigned int adcval, values, min, max;
+unsigned int buffer[1000];
