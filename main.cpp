@@ -20,10 +20,10 @@ void InitializeTimer()
   TIM4->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIM4->ARR = 2 - 1 ; // 0.000001 msec 21 MHz
+  TIM4->ARR = 2 - 1 ; // 0.000020 msec 50 kHz
 
   /* Set the Prescaler value */
-  TIM4->PSC = 2 - 1; // 84000 kHz / 2 = 42 MHz
+  TIM4->PSC = 840 - 1; // 84000 kHz / 840 = 100 kHz
 
   /* Generate an update event to reload the Prescaler
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
@@ -33,11 +33,6 @@ void InitializeTimer()
   TIM4->CR1 |= TIM_CR1_CEN;
   /* Enable the Interrupt sources */
   TIM4->DIER |= TIM_DIER_UIE;
-
-  /* Enable TIM4 interrupt */
-  NVIC_SetPriority(TIM4_IRQn, (1<<__NVIC_PRIO_BITS) - 1); //Set the lowest priority to TIM4 Interrupts
-  NVIC_ClearPendingIRQ(TIM4_IRQn);
-  NVIC_EnableIRQ(TIM4_IRQn);
 }
 
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
@@ -203,7 +198,7 @@ void handleADC()
 {
   /* Run acquisition */
   adcval = (uint16_t)ADC1->DR;
-  if (values == NVAL) {
+  if (values == NVAL*10) {
     //checkEnvrionment();
     freq = tmin = tmax = values = 0;
     int midval = ((maxval + minval)/2);
@@ -266,6 +261,8 @@ void handleADC()
     ledBlue::high();
   }
 #endif
+
+  adcval = 0;
 }
 
 void InitializeBoard()
@@ -293,12 +290,20 @@ void InitializeBoard()
   ADC_InitStructure.ADC_NbrOfConversion = 1;
   ADC_Init(ADC1, &ADC_InitStructure);
 
-  ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
+  //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
 
-  /* Enable ADC1 interrupt */
-  NVIC_SetPriority(ADC_IRQn, (1<<__NVIC_PRIO_BITS) - 1); //Set the lowest priority to ADC1 Interrupts
+  NVIC_SetPriority(ADC_IRQn,  4); //Set the lowest priority to ADC1 Interrupts
   NVIC_ClearPendingIRQ(ADC_IRQn);
   NVIC_EnableIRQ(ADC_IRQn);
+
+  /* Enable TIM4 interrupt */
+  NVIC_SetPriority(TIM4_IRQn, 8); //Set the lowest priority to TIM4 Interrupts
+  NVIC_ClearPendingIRQ(TIM4_IRQn);
+  NVIC_EnableIRQ(TIM4_IRQn);
+
+  /* ADC Power ON*/
+  ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
 
 #ifdef DEBUG
   /* Inizialization of LED's GPIOs*/
@@ -316,11 +321,28 @@ void InitializeBoard()
 
 int main()
 {
-	tmin=tmax=values = 0;
+	reg1=reg2=adcval=adcir=tmin=tmax=values = 0;
+
   InitializeBoard();
   if (POLLING)
   {
-    while (1) { handleADC(); }
+    while (1)
+    {
+      if (adcval == 0)
+      {
+        /* ADCx regular channel 8 configuration */
+        ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+
+        ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
+
+        /* Enable Interrupts */
+        ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
+
+        /* Enable ADC1 conversion for regular group */
+        ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
+        //delayUs(10);
+      }
+    }
   }
   else
   {
@@ -333,16 +355,13 @@ int main()
 
 void ADC_IRQHandler()
 {
-handleADC();
   /* Check the status of the EOC ADC interrupt */
   if (((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE))
   {
     /* Clear the selected ADC interrupt pending bits */
-    ADC1->SR = ~(uint32_t)ADC_SR_EOC;
-    /* Clear the selected ADC interrupt pending bits */
-    ADC1->SR = ~(uint32_t)ADC_SR_AWD;
+    ADC1->SR &= ~(uint32_t)ADC_SR_EOC;
 
-
+    handleADC();
   }
 
 	//unsigned int status=USART2->SR; //Read status of usart peripheral
@@ -372,6 +391,11 @@ void TIM4_IRQHandler()
 
     /* ADCx regular channel 8 configuration */
     ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+
+    ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
+
+    /* Enable Interrupts */
+    ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
 
     /* Enable ADC1 conversion for regular group */
     ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;

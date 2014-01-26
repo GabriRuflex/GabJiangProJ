@@ -7,7 +7,7 @@ using namespace miosix;
 
 #define POLLING                            0
 #define DEBUG
-#define NVAL				21000000
+#define NVAL				50000
 
 typedef Gpio<GPIOB_BASE,0> adcGPIO;
 #ifdef DEBUG
@@ -66,6 +66,7 @@ typedef struct
                                                This parameter must range from 1 to 16. */
 }ADC_InitTypeDef;
 
-unsigned int adcval, minval, maxval, nMax, diffAbs, countert, tmax, tmin;
+unsigned int adcval, minval, maxval, nMax, diffAbs, countert, tmax, tmin, adcir;
 double freq, diffPerc, values;
+uint32_t reg1, reg2, reg3;
 //unsigned int buffer[NVAL];
