@@ -29,8 +29,10 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 #define ADC_Resolution_12b                 ((uint32_t)0x00000000)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
 #define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00000000)
+/* ADC_external_trigger_edge_for_regular_channels_conversion */
+#define ADC_ExternalTrigConvEdge_Rising      ((uint32_t)0x10000000)
 /* ADC_extrenal_trigger_sources_for_regular_channels_conversion */
-#define ADC_ExternalTrigConv_T1_CC1        ((uint32_t)0x00000000)
+#define ADC_ExternalTrigConv_T2_TRGO        ((uint32_t)0x06000000)
 /* ADC_data_align */
 #define ADC_DataAlign_Right                ((uint32_t)0x00000000)
 /* ADC_channels */

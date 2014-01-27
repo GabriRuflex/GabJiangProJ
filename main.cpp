@@ -1,39 +1,6 @@
 #include "adc71.h"
 
-void InitializeTimer()
-{
-  /* Enable the Low Speed APB (APB1) peripheral clock. */
-  RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
-
-  /* Configure the timer */
-  uint16_t tmpcr1 = 0;
-  tmpcr1 = TIM4->CR1;
-
-  /* Select the Counter Mode */
-  tmpcr1 &= (uint16_t)(~(TIM_CR1_DIR | TIM_CR1_CMS)); //Set CMS to 00 (Edge-aligned mode) and DIR to 0 (Upcounter)
-  //tmpcr1 |= (uint32_t)0x0000;
-
-  /* Set the clock division */
-  tmpcr1 &=  (uint16_t)(~TIM_CR1_CKD); //Set CKD to 00 (timer clock = sampling clock used by the digital filters)
-  //tmpcr1 |= (uint32_t)0x0000;
-
-  TIM4->CR1 = tmpcr1;
-
-  /* Set the Autoreload value */
-  TIM4->ARR = 2 - 1 ; // 0.000020 msec 50 kHz
-
-  /* Set the Prescaler value */
-  TIM4->PSC = 840 - 1; // 84000 kHz / 840 = 100 kHz
-
-  /* Generate an update event to reload the Prescaler
-     and the repetition counter(only for TIM1 and TIM8) value immediatly */
-  TIM4->EGR = TIM_EGR_UG;
-
-  /* Enable the Counter */
-  TIM4->CR1 |= TIM_CR1_CEN;
-  /* Enable the Interrupt sources */
-  TIM4->DIER |= TIM_DIER_UIE;
-}
+/**************************************************************************************/
 
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 {
@@ -50,7 +17,7 @@ void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
   ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
 
   /* Initialize the ADC_ExternalTrigConv member */
-  ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
+  ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
 
   /* Initialize the ADC_DataAlign member */
   ADC_InitStruct->ADC_DataAlign = ADC_DataAlign_Right;
@@ -189,10 +156,104 @@ void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Ra
   ADCx->SQR3 = tmpreg1;
 }
 
-void checkEnvrionment()
+/**************************************************************************************/
+
+void InitializeBoard()
 {
-  //printf("Max: %u Min: %u", maxval, minval);
+  //unsigned int adcval;
+  ADC_InitTypeDef ADC_InitStructure;
+
+  /* Inizialization of ADC's GPIO */
+  adcGPIO::mode(Mode::INPUT_ANALOG); ///Floating Input       (MODE=11 TYPE=0 PUP=00)
+  adcGPIO::speed(Speed::_100MHz);
+
+  /* ADC1 Periph clock enable */
+  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
+
+  /* Reset ADC to default values */
+  ADC_DeInit();
+
+  /* ADC1 Configuration */
+  ADC_StructInit(&ADC_InitStructure);
+  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+#if POLLING == 0
+  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+  ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
+#endif
+  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_InitStructure.ADC_NbrOfConversion = 1;
+  ADC_Init(ADC1, &ADC_InitStructure);
+
+  /* ADCx regular channel 8 configuration */
+  ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+
+  /* Enable Interrupts */
+  ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
+
+  //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
+
+  NVIC_SetPriority(ADC_IRQn,  4); //Set the lowest priority to ADC1 Interrupts
+  NVIC_ClearPendingIRQ(ADC_IRQn);
+  NVIC_EnableIRQ(ADC_IRQn);
+
+  /* ADC Power ON*/
+  ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
+
+#ifdef DEBUG
+  /* Inizialization of LED's GPIOs*/
+  ledGreen::mode(Mode::OUTPUT); ///Push Pull  Output    (MODE=01 TYPE=0 PUP=00)
+  ledOrange::mode(Mode::OUTPUT);
+  ledRed::mode(Mode::OUTPUT);
+  ledBlue::mode(Mode::OUTPUT);
+
+  ledGreen::speed(Speed::_100MHz);
+  ledOrange::speed(Speed::_100MHz);
+  ledRed::speed(Speed::_100MHz);
+  ledBlue::speed(Speed::_100MHz);
+#endif
 }
+
+/**************************************************************************************/
+
+void InitializeTimer()
+{
+  /* Enable the Low Speed APB (APB1) peripheral clock. */
+  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+
+  /* Configure the timer */
+  uint16_t tmpcr1 = 0;
+  tmpcr1 = TIM2->CR1;
+
+  /* Select the Counter Mode */
+  tmpcr1 &= (uint16_t)(~(TIM_CR1_DIR | TIM_CR1_CMS)); //Set CMS to 00 (Edge-aligned mode) and DIR to 0 (Upcounter)
+
+  /* Set the clock division */
+  tmpcr1 &=  (uint16_t)(~TIM_CR1_CKD); //Set CKD to 00 (timer clock = sampling clock used by the digital filters)
+
+  TIM2->CR1 = tmpcr1;
+
+  /* Set the Autoreload value */
+  TIM2->ARR = 2 - 1 ; // 0.000020 msec 50 kHz
+  /* Set the Prescaler value */
+  TIM2->PSC = 2 - 1; // 84000 kHz / 840 = 100 kHz
+
+  /* Generate an update event to reload the Prescaler
+     and the repetition counter(only for TIM1 and TIM8) value immediatly */
+  TIM2->EGR = TIM_EGR_UG;
+
+  /* Reset the MMS Bits */
+  TIM2->CR2 &= (uint16_t)~TIM_CR2_MMS;
+  /* Select the TRGO source */
+  TIM2->CR2 |=  TIM_CR2_MMS_1;
+
+  /* Enable the Counter */
+  TIM2->CR1 |= TIM_CR1_CEN;
+}
+
+/**************************************************************************************/
 
 void handleADC()
 {
@@ -230,7 +291,6 @@ void handleADC()
 
   values++;
 
-  //printf("%u",maxval);
 #ifdef DEBUG
   if (adcval < 300)
   {
@@ -265,94 +325,6 @@ void handleADC()
   adcval = 0;
 }
 
-void InitializeBoard()
-{
-  //unsigned int adcval;
-  ADC_InitTypeDef ADC_InitStructure;
-
-  /* Inizialization of ADC's GPIO */
-  adcGPIO::mode(Mode::INPUT_ANALOG); ///Floating Input       (MODE=11 TYPE=0 PUP=00)
-  adcGPIO::speed(Speed::_100MHz);
-
-  /* ADC1 Periph clock enable */
-  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-
-  /* Reset ADC to default values */
-  ADC_DeInit();
-
-  /* ADC1 Configuration */
-  ADC_StructInit(&ADC_InitStructure);
-  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfConversion = 1;
-  ADC_Init(ADC1, &ADC_InitStructure);
-
-  //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
-
-  NVIC_SetPriority(ADC_IRQn,  4); //Set the lowest priority to ADC1 Interrupts
-  NVIC_ClearPendingIRQ(ADC_IRQn);
-  NVIC_EnableIRQ(ADC_IRQn);
-
-  /* Enable TIM4 interrupt */
-  NVIC_SetPriority(TIM4_IRQn, 8); //Set the lowest priority to TIM4 Interrupts
-  NVIC_ClearPendingIRQ(TIM4_IRQn);
-  NVIC_EnableIRQ(TIM4_IRQn);
-
-  /* ADC Power ON*/
-  ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
-
-#ifdef DEBUG
-  /* Inizialization of LED's GPIOs*/
-  ledGreen::mode(Mode::OUTPUT); ///Push Pull  Output    (MODE=01 TYPE=0 PUP=00)
-  ledOrange::mode(Mode::OUTPUT);
-  ledRed::mode(Mode::OUTPUT);
-  ledBlue::mode(Mode::OUTPUT);
-
-  ledGreen::speed(Speed::_100MHz);
-  ledOrange::speed(Speed::_100MHz);
-  ledRed::speed(Speed::_100MHz);
-  ledBlue::speed(Speed::_100MHz);
-#endif
-}
-
-int main()
-{
-	reg1=reg2=adcval=adcir=tmin=tmax=values = 0;
-
-  InitializeBoard();
-  if (POLLING)
-  {
-    while (1)
-    {
-      if (adcval == 0)
-      {
-        /* ADCx regular channel 8 configuration */
-        ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
-
-        ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
-
-        /* Enable Interrupts */
-        ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
-
-        /* Enable ADC1 conversion for regular group */
-        ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
-        //delayUs(10);
-      }
-    }
-  }
-  else
-  {
-    InitializeTimer();
-    while(1);
-  }
-
-  return 0;
-}
-
 void ADC_IRQHandler()
 {
   /* Check the status of the EOC ADC interrupt */
@@ -375,29 +347,34 @@ void ADC_IRQHandler()
 	//}
 }
 
-void TIM4_IRQHandler()
+/**************************************************************************************/
+
+int main()
 {
-  uint16_t itstatus = 0x0, itenable = 0x0;
+	reg1=reg2=adcval=adcir=tmin=tmax=values = 0;
 
-  /* Check interrupt status */
-  itstatus = TIM4->SR & TIM_SR_UIF;
-  /* Check interrupt enabled */
-  itenable = TIM4->DIER & TIM_DIER_UIE;
-
-  if ((itstatus != (uint16_t)RESET) && (itenable != (uint16_t)RESET))
+  InitializeBoard();
+  if (POLLING)
   {
-    /* Clear the IT pending Bit */
-    TIM4->SR = (uint16_t)~TIM_SR_UIF;
+    while (1)
+    {
+      if (adcval == 0)
+      {
+        ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
 
-    /* ADCx regular channel 8 configuration */
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+        /* Enable Interrupts */
+        ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
 
-    ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
-
-    /* Enable Interrupts */
-    ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
-
-    /* Enable ADC1 conversion for regular group */
-    ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
+        /* Enable ADC1 conversion for regular group */
+        ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
+      }
+    }
   }
+  else
+  {
+    InitializeTimer();
+    while(1);
+  }
+
+  return 0;
 }
