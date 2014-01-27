@@ -4,26 +4,22 @@
 
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 {
-  /* Initialize the ADC_Mode member */
+  /* Initialize the ADC_StructInit members */
   ADC_InitStruct->ADC_Resolution = ADC_Resolution_12b;
-
-  /* initialize the ADC_ScanConvMode member */
   ADC_InitStruct->ADC_ScanConvMode = DISABLE;
-
-  /* Initialize the ADC_ContinuousConvMode member */
   ADC_InitStruct->ADC_ContinuousConvMode = DISABLE;
-
-  /* Initialize the ADC_ExternalTrigConvEdge member */
-  ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-
-  /* Initialize the ADC_ExternalTrigConv member */
+#if POLLING == 0
+  ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
   ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
-
-  /* Initialize the ADC_DataAlign member */
+#else
+  ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+  ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConvEdge_None;
+#endif
   ADC_InitStruct->ADC_DataAlign = ADC_DataAlign_Right;
-
-  /* Initialize the ADC_NbrOfConversion member */
   ADC_InitStruct->ADC_NbrOfConversion = 1;
+  ADC_InitStruct->ADC_Channel = 8;
+  ADC_InitStruct->ADC_Rank = 1;
+  ADC_InitStruct->ADC_SampleTime = 7; //480Cycles
 }
 
 /**
@@ -51,40 +47,39 @@ void ADC_DeInit(void)
   */
 void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
 {
-  uint32_t tmpreg1 = 0;
+  uint32_t tmpreg1 = 0, tmpreg3 = 0;
   uint8_t tmpreg2 = 0;
 
   /*---------------------------- ADCx CR1 Configuration -----------------*/
   /* Get the ADCx CR1 value */
   tmpreg1 = ADCx->CR1;
 
-  /* Clear RES and SCAN bits */
-  tmpreg1 &= CR1_CLEAR_MASK;
-
   /* Configure ADCx: scan conversion mode and resolution */
-  /* Set SCAN bit according to ADC_ScanConvMode value */
-  /* Set RES bit according to ADC_Resolution value */
-  tmpreg1 |= (uint32_t)(((uint32_t)ADC_InitStruct->ADC_ScanConvMode << 8) | \
-                                   ADC_InitStruct->ADC_Resolution);
+  tmpreg1 &= ~ADC_CR1_SCAN; // Clear SCAN bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_ScanConvMode << 8; // Set SCAN bit according to ADC_ScanConvMode value
+
+  tmpreg1 &= ~ADC_CR1_RES; // Clear RES bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_Resolution << 24; // Set RES bit according to ADC_Resolution value
+
   /* Write to ADCx CR1 */
   ADCx->CR1 = tmpreg1;
   /*---------------------------- ADCx CR2 Configuration -----------------*/
   /* Get the ADCx CR2 value */
   tmpreg1 = ADCx->CR2;
 
-  /* Clear CONT, ALIGN, EXTEN and EXTSEL bits */
-  tmpreg1 &= CR2_CLEAR_MASK;
-
   /* Configure ADCx: external trigger event and edge, data alignment and
      continuous conversion mode */
-  /* Set ALIGN bit according to ADC_DataAlign value */
-  /* Set EXTEN bits according to ADC_ExternalTrigConvEdge value */
-  /* Set EXTSEL bits according to ADC_ExternalTrigConv value */
-  /* Set CONT bit according to ADC_ContinuousConvMode value */
-  tmpreg1 |= (uint32_t)(ADC_InitStruct->ADC_DataAlign | \
-                        ADC_InitStruct->ADC_ExternalTrigConv |
-                        ADC_InitStruct->ADC_ExternalTrigConvEdge | \
-                        ((uint32_t)ADC_InitStruct->ADC_ContinuousConvMode << 1));
+  tmpreg1 &= ~ADC_CR2_EXTEN; // Clear EXTEN bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_ExternalTrigConvEdge << 28; // Set EXTEN bits according to ADC_ExternalTrigConvEdge value
+
+  tmpreg1 &= ~ADC_CR2_EXTSEL; // Clear EXTSEL bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_ExternalTrigConv << 24; // Set EXTSEL bits according to ADC_ExternalTrigConv value
+
+  tmpreg1 &= ~ADC_CR2_ALIGN; // Clear ALIGN bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_DataAlign << 11; // Set ALIGN bit according to ADC_DataAlign value
+
+  tmpreg1 &= ~ADC_CR2_CONT; // Clear CONT bits
+  tmpreg1 |= (uint32_t)ADC_InitStruct->ADC_ContinuousConvMode << 1; // Set CONT bit according to ADC_ContinuousConvMode value
 
   /* Write to ADCx CR2 */
   ADCx->CR2 = tmpreg1;
@@ -93,7 +88,7 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
   tmpreg1 = ADCx->SQR1;
 
   /* Clear L bits */
-  tmpreg1 &= SQR1_L_RESET;
+  tmpreg1 &= ADC_SQR1_L;
 
   /* Configure ADCx: regular channel sequence length */
   /* Set L bits according to ADC_NbrOfConversion value */
@@ -102,52 +97,39 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
 
   /* Write to ADCx SQR1 */
   ADCx->SQR1 = tmpreg1;
-}
-
-/**
-  * @brief  Configures for the selected ADC regular channel its corresponding
-  *         rank in the sequencer and its sample time.
-  * @param  ADCx: where x can be 1, 2 or 3 to select the ADC peripheral.
-  * @param  ADC_Channel: the ADC channel to configure.
-  * @param  Rank: The rank in the regular group sequencer.
-  *          This parameter must be between 1 to 16.
-  * @param  ADC_SampleTime: The sample time value to be set for the selected channel.
-  * @retval None
-  */
-void ADC_RegularChannelConfig(ADC_TypeDef* ADCx, uint8_t ADC_Channel, uint8_t Rank, uint8_t ADC_SampleTime)
-{
-  /* with some limitations: channel < 10, rank < 8 */
-  uint32_t tmpreg1 = 0, tmpreg2 = 0;
+  /*---------------------------- ADCx SMPR2 Configuration -----------------*/
+  /* Channel < 10, rank < 8 */
+  tmpreg1 = 0, tmpreg3 = 0;
 
   /* Get the old register value */
   tmpreg1 = ADCx->SMPR2;
 
   /* Calculate the mask to clear */
-  tmpreg2 = ADC_SMPR2_SMP0 << (3 * ADC_Channel);
+  tmpreg3 = ADC_SMPR2_SMP0 << (3 * ADC_InitStruct->ADC_Channel);
 
   /* Clear the old sample time */
   tmpreg1 &= ~tmpreg2;
 
   /* Calculate the mask to set */
-  tmpreg2 = (uint32_t)ADC_SampleTime << (3 * ADC_Channel);
+  tmpreg3 = (uint32_t)ADC_InitStruct->ADC_SampleTime << (3 * ADC_InitStruct->ADC_Channel);
 
   /* Set the new sample time */
-  tmpreg1 |= tmpreg2;
+  tmpreg1 |= tmpreg3;
 
   /* Store the new register value */
   ADCx->SMPR2 = tmpreg1;
-
+  /*---------------------------- ADCx SQ3 Configuration -----------------*/
   /* Get the old register value */
   tmpreg1 = ADCx->SQR3;
 
   /* Calculate the mask to clear */
-  tmpreg2 = ADC_SQR3_SQ1 << (5 * (Rank - 1));
+  tmpreg3 = ADC_SQR3_SQ1 << (5 * (ADC_InitStruct->ADC_Rank - 1));
 
   /* Clear the old SQx bits for the selected rank */
-  tmpreg1 &= ~tmpreg2;
+  tmpreg1 &= ~tmpreg3;
 
   /* Calculate the mask to set */
-  tmpreg2 = (uint32_t)ADC_Channel << (5 * (Rank - 1));
+  tmpreg2 = (uint32_t)ADC_InitStruct->ADC_Channel << (5 * (ADC_InitStruct->ADC_Rank - 1));
 
   /* Set the SQx bits for the selected rank */
   tmpreg1 |= tmpreg2;
@@ -173,21 +155,11 @@ void InitializeBoard()
   /* Reset ADC to default values */
   ADC_DeInit();
 
-  /* ADC1 Configuration */
+  /* ADC1 Struct initialization */
   ADC_StructInit(&ADC_InitStructure);
-  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-#if POLLING == 0
-  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-  ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
-#endif
-  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfConversion = 1;
-  ADC_Init(ADC1, &ADC_InitStructure);
 
-  /* ADCx regular channel 8 configuration */
-  ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_480Cycles);
+  /* ADC1 Configuration */
+  ADC_Init(ADC1, &ADC_InitStructure);
 
   /* Enable Interrupts */
   ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
@@ -236,9 +208,9 @@ void InitializeTimer()
   TIM2->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIM2->ARR = 2 - 1 ; // 0.000020 msec 50 kHz
+  TIM2->ARR = 2 - 1 ; // 42 / 2 = 21 MHz
   /* Set the Prescaler value */
-  TIM2->PSC = 2 - 1; // 84000 kHz / 840 = 100 kHz
+  TIM2->PSC = 2 - 1; // 84000 kHz / 2 = 42 MHz
 
   /* Generate an update event to reload the Prescaler
      and the repetition counter(only for TIM1 and TIM8) value immediatly */

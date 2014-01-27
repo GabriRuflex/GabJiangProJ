@@ -17,24 +17,16 @@ typedef Gpio<GPIOD_BASE,14> ledRed;
 typedef Gpio<GPIOD_BASE,15> ledBlue;
 #endif
 
-/****** ADC definitions ******/
-/* CR1 register Mask */
-#define CR1_CLEAR_MASK                     ((uint32_t)0xFCFFFEFF)
-/* CR2 register Mask */
-#define CR2_CLEAR_MASK                     ((uint32_t)0xC0FFF7FD)
-/* ADC L Mask */
-#define SQR1_L_RESET                       ((uint32_t)0xFF0FFFFF)
-
 /* ADC_resolution */
-#define ADC_Resolution_12b                 ((uint32_t)0x00000000)
+#define ADC_Resolution_12b                 ((uint32_t)0x00)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
-#define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00000000)
+#define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
-#define ADC_ExternalTrigConvEdge_Rising      ((uint32_t)0x10000000)
+#define ADC_ExternalTrigConvEdge_Rising      ((uint32_t)0x01)
 /* ADC_extrenal_trigger_sources_for_regular_channels_conversion */
-#define ADC_ExternalTrigConv_T2_TRGO        ((uint32_t)0x06000000)
+#define ADC_ExternalTrigConv_T2_TRGO        ((uint32_t)0x06)
 /* ADC_data_align */
-#define ADC_DataAlign_Right                ((uint32_t)0x00000000)
+#define ADC_DataAlign_Right                ((uint32_t)0x00)
 /* ADC_channels */
 #define ADC_Channel_8                      ((uint8_t)0x08)
 /* ADC_sampling_times */
@@ -63,6 +55,18 @@ typedef struct
                                                is left or right. This parameter can be
                                                a value of @ref ADC_data_align */
   uint8_t  ADC_NbrOfConversion;           /*!< Specifies the number of ADC conversions
+                                               that will be done using the sequencer for
+                                               regular channel group.
+                                               This parameter must range from 1 to 16. */
+  uint8_t  ADC_Channel;                   /*!< Specifies the number of ADC conversions
+                                               that will be done using the sequencer for
+                                               regular channel group.
+                                               This parameter must range from 1 to 16. */
+  uint8_t  ADC_Rank;                          /*!< Specifies the number of ADC conversions
+                                               that will be done using the sequencer for
+                                               regular channel group.
+                                               This parameter must range from 1 to 16. */
+  uint8_t  ADC_SampleTime;                /*!< Specifies the number of ADC conversions
                                                that will be done using the sequencer for
                                                regular channel group.
                                                This parameter must range from 1 to 16. */
