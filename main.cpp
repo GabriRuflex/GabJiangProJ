@@ -1,7 +1,5 @@
 #include "adc71.h"
-
 /**************************************************************************************/
-
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 {
   /* Initialize the ADC_StructInit members */
@@ -137,9 +135,7 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
   /* Store the new register value */
   ADCx->SQR3 = tmpreg1;
 }
-
 /**************************************************************************************/
-
 void InitializeBoard()
 {
   //unsigned int adcval;
@@ -167,7 +163,7 @@ void InitializeBoard()
   //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
   SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
 
-  NVIC_SetPriority(ADC_IRQn,  4); //Set the lowest priority to ADC1 Interrupts
+  NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
   NVIC_ClearPendingIRQ(ADC_IRQn);
   NVIC_EnableIRQ(ADC_IRQn);
 
@@ -187,9 +183,7 @@ void InitializeBoard()
   ledBlue::speed(Speed::_100MHz);
 #endif
 }
-
 /**************************************************************************************/
-
 void InitializeTimer()
 {
   /* Enable the Low Speed APB (APB1) peripheral clock. */
@@ -208,9 +202,9 @@ void InitializeTimer()
   TIM2->CR1 = tmpcr1;
 
   /* Set the Autoreload value */
-  TIM2->ARR = 2 - 1 ; // 42 / 2 = 21 MHz
+  TIM2->ARR = 2 - 1 ; // 10 kHz / 2 = 5 kHz
   /* Set the Prescaler value */
-  TIM2->PSC = 2 - 1; // 84000 kHz / 2 = 42 MHz
+  TIM2->PSC = 8400 - 1; // 84000 kHz / 8400 = 10 kHz
 
   /* Generate an update event to reload the Prescaler
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
@@ -224,42 +218,24 @@ void InitializeTimer()
   /* Enable the Counter */
   TIM2->CR1 |= TIM_CR1_CEN;
 }
-
 /**************************************************************************************/
-
 void handleADC()
 {
   /* Run acquisition */
   adcval = (uint16_t)ADC1->DR;
-  if (values == NVAL*10) {
-    //checkEnvrionment();
-    freq = tmin = tmax = values = 0;
-    int midval = ((maxval + minval)/2);
-    diffAbs = maxval - midval;
-    diffPerc = (double)(maxval - midval) / midval;
-    minval = maxval = midval;
-  }
-
-  if (adcval > maxval) {
+  buffer[values] = adcval;
+  /*if (adcval >= maxval) {
+    if (adcval > maxval) nmax = 0;
     maxval = adcval;
-    minval = maxval;
-    double period = (double)1/NVAL;
-    double interval = (double)(tmin - tmax) * period;
-    if (tmin > tmax) {
-      freq = (double)1/interval;
-    }
-    tmax = values;
+    tmax[nmax] = values;
+    nmax++;
   }
-  else if (adcval < minval) {
+  else if (adcval <= minval) {
+    if (adcval < minval) nmin = 0;
     minval = adcval;
-    maxval = minval;
-    double period = (double)1/NVAL;
-    double interval = (double)(tmax - tmin) * period;
-    if (tmax > tmin) {
-      freq = (double)1/interval;
-    }
-    tmin = values;
-  }
+    tmin[nmin] = values;
+    nmin++;
+  }*/
 
   values++;
 
@@ -293,19 +269,21 @@ void handleADC()
     ledBlue::high();
   }
 #endif
-
-  adcval = 0;
 }
 
 void ADC_IRQHandler()
 {
   /* Check the status of the EOC ADC interrupt */
-  if (((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE))
+  if ((((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE)) && (values < NVAL))
   {
     /* Clear the selected ADC interrupt pending bits */
     ADC1->SR &= ~(uint32_t)ADC_SR_EOC;
 
     handleADC();
+  }
+  else if (NVAL == values)
+  {
+    NVIC_DisableIRQ(ADC_IRQn);
   }
 
 	//unsigned int status=USART2->SR; //Read status of usart peripheral
@@ -318,12 +296,10 @@ void ADC_IRQHandler()
 	//	numchar++;
 	//}
 }
-
 /**************************************************************************************/
-
 int main()
 {
-	reg1=reg2=adcval=adcir=tmin=tmax=values = 0;
+	reg1=reg2=adcval=values = 0;
 
   InitializeBoard();
   if (POLLING)
@@ -345,7 +321,25 @@ int main()
   else
   {
     InitializeTimer();
-    while(1);
+    while(1) {
+      if (values == NVAL) { //values == NVAL
+        /*int vmid = ((vmax[0] + vmin[0])/2);
+        diffAbs = maxval - minval;
+        diffPerc = (double)(maxval - minval) / vmid;
+
+        double period = (double)1/NVAL;
+        double interval = (double)(tmin - tmax) * period;
+
+        freq = (double)1/interval;
+
+        minval = numeric_limits<unsigned int>::min();
+        maxval = numeric_limits<unsigned int>::max();*/
+        printf("Valore letto: %u\n", adcval);
+
+        values = 0;
+        NVIC_EnableIRQ(ADC_IRQn);
+      }
+    }
   }
 
   return 0;
