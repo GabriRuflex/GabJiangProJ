@@ -1,13 +1,13 @@
 #include <cstdio>
+#include <pthread.h>
 #include <unistd.h>
 #include "miosix.h"
 
 using namespace std;
 using namespace miosix;
 
-#define POLLING                            0
 #define DEBUG
-#define NVAL				50000
+#define NVAL				5000
 
 typedef Gpio<GPIOB_BASE,0> adcGPIO;
 #ifdef DEBUG
@@ -19,8 +19,6 @@ typedef Gpio<GPIOD_BASE,15> ledBlue;
 
 /* ADC_resolution */
 #define ADC_Resolution_12b                 ((uint32_t)0x00)
-/* ADC_external_trigger_edge_for_regular_channels_conversion */
-#define ADC_ExternalTrigConvEdge_None      ((uint32_t)0x00)
 /* ADC_external_trigger_edge_for_regular_channels_conversion */
 #define ADC_ExternalTrigConvEdge_Rising      ((uint32_t)0x01)
 /* ADC_extrenal_trigger_sources_for_regular_channels_conversion */
@@ -72,7 +70,4 @@ typedef struct
                                                This parameter must range from 1 to 16. */
 }ADC_InitTypeDef;
 
-unsigned int adcval, minval, maxval, nMax, diffAbs, countert, tmax, tmin, adcir;
-double freq, diffPerc, values;
-uint32_t reg1, reg2, reg3;
-//unsigned int buffer[NVAL];
+unsigned short values, adcval, buffer[NVAL];

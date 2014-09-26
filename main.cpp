@@ -6,13 +6,8 @@ void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
   ADC_InitStruct->ADC_Resolution = ADC_Resolution_12b;
   ADC_InitStruct->ADC_ScanConvMode = DISABLE;
   ADC_InitStruct->ADC_ContinuousConvMode = DISABLE;
-#if POLLING == 0
   ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
   ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
-#else
-  ADC_InitStruct->ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-  ADC_InitStruct->ADC_ExternalTrigConv = ADC_ExternalTrigConvEdge_None;
-#endif
   ADC_InitStruct->ADC_DataAlign = ADC_DataAlign_Right;
   ADC_InitStruct->ADC_NbrOfConversion = 1;
   ADC_InitStruct->ADC_Channel = 8;
@@ -224,19 +219,6 @@ void handleADC()
   /* Run acquisition */
   adcval = (uint16_t)ADC1->DR;
   buffer[values] = adcval;
-  /*if (adcval >= maxval) {
-    if (adcval > maxval) nmax = 0;
-    maxval = adcval;
-    tmax[nmax] = values;
-    nmax++;
-  }
-  else if (adcval <= minval) {
-    if (adcval < minval) nmin = 0;
-    minval = adcval;
-    tmin[nmin] = values;
-    nmin++;
-  }*/
-
   values++;
 
 #ifdef DEBUG
@@ -280,65 +262,43 @@ void ADC_IRQHandler()
     ADC1->SR &= ~(uint32_t)ADC_SR_EOC;
 
     handleADC();
-  }
-  else if (NVAL == values)
-  {
-    NVIC_DisableIRQ(ADC_IRQn);
-  }
-
-	//unsigned int status=USART2->SR; //Read status of usart peripheral
-	//char c=USART2->DR;              //Read possibly received char
-	//if(status & USART_SR_RXNE)      //Did we receive a char?
-	//{
-	//	if(numchar==bufsize) return; //Buffer empty
-	//	rxbuffer[putpos]=c;
-	//	if(++putpos >= bufsize) putpos=0;
-	//	numchar++;
-	//}
-}
-/**************************************************************************************/
-int main()
-{
-	reg1=reg2=adcval=values = 0;
-
-  InitializeBoard();
-  if (POLLING)
-  {
-    while (1)
+    if (NVAL == values)
     {
-      if (adcval == 0)
-      {
-        ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
-
-        /* Enable Interrupts */
-        ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
-
-        /* Enable ADC1 conversion for regular group */
-        ADC1->CR2 |= (uint32_t)ADC_CR2_SWSTART;
-      }
+      NVIC_DisableIRQ(ADC_IRQn);
     }
   }
-  else
-  {
-    InitializeTimer();
-    while(1) {
-      if (values == NVAL) { //values == NVAL
-        /*int vmid = ((vmax[0] + vmin[0])/2);
-        diffAbs = maxval - minval;
-        diffPerc = (double)(maxval - minval) / vmid;
+}
+/**************************************************************************************/
 
-        double period = (double)1/NVAL;
-        double interval = (double)(tmin - tmax) * period;
+void *threadFunction(void *arg)
+{
+  printf("Valore letto: %u\n", adcval);
+}
 
-        freq = (double)1/interval;
+int main()
+{
+	adcval = values = 0;
+  pthread_t t;
 
-        minval = numeric_limits<unsigned int>::min();
-        maxval = numeric_limits<unsigned int>::max();*/
-        printf("Valore letto: %u\n", adcval);
-
-        values = 0;
-        NVIC_EnableIRQ(ADC_IRQn);
+  InitializeBoard();
+  InitializeTimer();
+  
+  while(1) {
+    if (values == NVAL) {
+      /*pthread_create(&t,NULL,&threadFunction,NULL);
+      pthread_join(t,NULL);*/
+      
+      int i, sum = 0;
+      for (i = 0; i < NVAL; i++) {
+        sum += buffer[i];
       }
+      
+      float avg = (float) sum / NVAL; 
+      printf("Valore letto: %.2f\n", avg);
+
+      values = 0;
+
+      NVIC_EnableIRQ(ADC_IRQn);
     }
   }
 
