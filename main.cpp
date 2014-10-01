@@ -156,11 +156,11 @@ void InitializeBoard()
   ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
 
   //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
+  //SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
 
-  NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
-  NVIC_ClearPendingIRQ(ADC_IRQn);
-  NVIC_EnableIRQ(ADC_IRQn);
+  //NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
+  //NVIC_ClearPendingIRQ(ADC_IRQn);
+  //NVIC_EnableIRQ(ADC_IRQn);
 
   /* ADC Power ON*/
   ADC1->CR2 |= (uint32_t)ADC_CR2_ADON;
@@ -213,6 +213,39 @@ void InitializeTimer()
   /* Enable the Counter */
   TIM2->CR1 |= TIM_CR1_CEN;
 }
+
+void DisableADC()
+{
+  //Riduzione della frequenza di hard fault
+  //con lo spegnimento del clock del timer e dell'ADC
+  /*RCC->APB2ENR &= ~RCC_APB2ENR_ADC1EN;
+  RCC->APB1ENR &= ~RCC_APB1ENR_TIM2EN;*/
+
+  ADC1->CR1 &= ~(uint32_t)ADC_CR1_EOCIE;
+  TIM2->CR1 &= ~TIM_CR1_CEN;
+
+  NVIC_DisableIRQ(ADC_IRQn);
+}
+
+void EnableADC()
+{
+  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
+  NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
+  NVIC_ClearPendingIRQ(ADC_IRQn);
+
+  NVIC_EnableIRQ(ADC_IRQn);
+
+  TIM2->CR1 |= TIM_CR1_CEN;
+  ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
+
+  /*TIM2->EGR = TIM_EGR_UG;*/
+
+  //Riduzione della frequenza di hard fault
+  //con lo spegnimento del clock del timer e dell'ADC
+
+  /*RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;*/
+}
 /**************************************************************************************/
 void handleADC()
 {
@@ -252,54 +285,80 @@ void handleADC()
   }
 #endif
 }
+/**************************************************************************************/
+void __attribute__((naked)) ADC_IRQHandler()
+{
+  saveContext();
+  asm volatile("bl _Z17ADCIRQHandlerImplv");
+  restoreContext();
+}
 
-void ADC_IRQHandler()
+void __attribute__((used)) ADCIRQHandlerImpl()
 {
   /* Check the status of the EOC ADC interrupt */
-  if ((((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE)) && (values < NVAL))
+  if (((((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE)) && (values < NVAL)) && waiting != 0)
   {
     /* Clear the selected ADC interrupt pending bits */
     ADC1->SR &= ~(uint32_t)ADC_SR_EOC;
 
     handleADC();
+
     if (NVAL == values)
     {
-      NVIC_DisableIRQ(ADC_IRQn);
+      DisableADC();
+
+      if(waiting == 0) {
+        return;
+      }
+
+      waiting->IRQwakeup();
+
+      if(waiting->IRQgetPriority() > Thread::IRQgetCurrentThread()->IRQgetPriority()) {
+		    Scheduler::IRQfindNextThread();
+      }
+
+      waiting = 0;
     }
   }
 }
-/**************************************************************************************/
 
-void *threadFunction(void *arg)
+void waitForADC()
 {
-  printf("Valore letto: %u\n", adcval);
+    EnableADC();
+
+    FastInterruptDisableLock dLock;
+    waiting = Thread::IRQgetCurrentThread();
+
+    while(waiting)
+    {
+        Thread::IRQwait();
+        FastInterruptEnableLock eLock(dLock);
+        Thread::yield();
+    }
 }
 
 int main()
 {
+  int i, sum;
+  float avg;
+
 	adcval = values = 0;
-  pthread_t t;
 
   InitializeBoard();
   InitializeTimer();
-  
+
   while(1) {
-    if (values == NVAL) {
-      /*pthread_create(&t,NULL,&threadFunction,NULL);
-      pthread_join(t,NULL);*/
-      
-      int i, sum = 0;
-      for (i = 0; i < NVAL; i++) {
-        sum += buffer[i];
-      }
-      
-      float avg = (float) sum / NVAL; 
-      printf("Valore letto: %.2f\n", avg);
+    waitForADC();
 
-      values = 0;
-
-      NVIC_EnableIRQ(ADC_IRQn);
+    sum = 0;
+    for (i = 0; i < NVAL; i++) {
+      sum += buffer[i];
     }
+    avg = (float) sum / NVAL;
+
+    printf("Ultimo valore: %d Num.valori: %d Media: %.2f\n", adcval, values, avg);
+
+    values = 0;
   }
 
   return 0;

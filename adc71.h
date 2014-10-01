@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "miosix.h"
+#include <miosix/kernel/scheduler/scheduler.h>
 
 using namespace std;
 using namespace miosix;
@@ -70,4 +71,6 @@ typedef struct
                                                This parameter must range from 1 to 16. */
 }ADC_InitTypeDef;
 
-unsigned short values, adcval, buffer[NVAL];
+static Thread *waiting = 0;
+volatile static uint16_t adcval;
+volatile static int values, buffer[NVAL];
