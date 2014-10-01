@@ -216,27 +216,27 @@ void InitializeTimer()
 
 void DisableADC()
 {
+  NVIC_DisableIRQ(ADC_IRQn);
+
   //Riduzione della frequenza di hard fault
   //con lo spegnimento del clock del timer e dell'ADC
   /*RCC->APB2ENR &= ~RCC_APB2ENR_ADC1EN;
   RCC->APB1ENR &= ~RCC_APB1ENR_TIM2EN;*/
 
-  ADC1->CR1 &= ~(uint32_t)ADC_CR1_EOCIE;
-  TIM2->CR1 &= ~TIM_CR1_CEN;
-
-  NVIC_DisableIRQ(ADC_IRQn);
+  /*ADC1->CR1 &= ~(uint32_t)ADC_CR1_EOCIE;
+  TIM2->CR1 &= ~TIM_CR1_CEN;*/
 }
 
 void EnableADC()
 {
-  SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
-  NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
-  NVIC_ClearPendingIRQ(ADC_IRQn);
+  //SCB->AIRCR = (uint32_t)0x05FA0000 | (uint32_t)0x300; //4 bits for preemp priority 0 bit for sub priority
 
+  NVIC_ClearPendingIRQ(ADC_IRQn);
+  NVIC_SetPriority(ADC_IRQn,  15); //Set the lowest priority to ADC1 Interrupts
   NVIC_EnableIRQ(ADC_IRQn);
 
-  TIM2->CR1 |= TIM_CR1_CEN;
-  ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;
+  /*TIM2->CR1 |= TIM_CR1_CEN;
+  ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE;*/
 
   /*TIM2->EGR = TIM_EGR_UG;*/
 
