@@ -1,16 +1,5 @@
-#include <cstdio>
-#include <pthread.h>
-#include <unistd.h>
-#include "miosix.h"
-#include <miosix/kernel/scheduler/scheduler.h>
-
-using namespace std;
-using namespace miosix;
-
-#define DEBUG
-#define NVAL				5000
-
 typedef Gpio<GPIOB_BASE,0> adcGPIO;
+
 #ifdef DEBUG
 typedef Gpio<GPIOD_BASE,12> ledGreen;
 typedef Gpio<GPIOD_BASE,13> ledOrange;
