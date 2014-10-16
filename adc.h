@@ -1,5 +1,6 @@
 typedef Gpio<GPIOB_BASE,0> adcGPIO;
 
+//! Defines leds' GPIOs when DEBUG is enabled
 #ifdef DEBUG
 typedef Gpio<GPIOD_BASE,12> ledGreen;
 typedef Gpio<GPIOD_BASE,13> ledOrange;
@@ -7,17 +8,17 @@ typedef Gpio<GPIOD_BASE,14> ledRed;
 typedef Gpio<GPIOD_BASE,15> ledBlue;
 #endif
 
-/* ADC_resolution */
+//! ADC_resolution
 #define ADC_Resolution_12b                 ((uint32_t)0x00)
-/* ADC_external_trigger_edge_for_regular_channels_conversion */
+//! ADC_external_trigger_edge_for_regular_channels_conversion
 #define ADC_ExternalTrigConvEdge_Rising      ((uint32_t)0x01)
-/* ADC_extrenal_trigger_sources_for_regular_channels_conversion */
+//! ADC_extrenal_trigger_sources_for_regular_channels_conversion
 #define ADC_ExternalTrigConv_T2_TRGO        ((uint32_t)0x06)
-/* ADC_data_align */
+//! ADC_data_align
 #define ADC_DataAlign_Right                ((uint32_t)0x00)
-/* ADC_channels */
+//! ADC_channels
 #define ADC_Channel_8                      ((uint8_t)0x08)
-/* ADC_sampling_times */
+//! ADC_sampling_times
 #define ADC_SampleTime_480Cycles             ((uint8_t)0x07)
 
 typedef struct

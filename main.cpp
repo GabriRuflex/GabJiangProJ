@@ -1,11 +1,31 @@
 #include "libs.h"
 
+/*!
+* \brief  Waits for the filling of buffer's values
+* \param  void
+* \return void: None
+*/
+void waitForADC()
+{
+    FastInterruptDisableLock dLock; //! Disables interrupts
+    waiting = Thread::IRQgetCurrentThread(); //! Sets current thread (main) as waiting
+    
+    EnableADC(); //! Enables ADC's interrupts
+
+    while(waiting)
+    {
+        Thread::IRQwait(); //! Puts the current thread in wait status (in a piece of code where interrupts are disabled)
+        FastInterruptEnableLock eLock(dLock); //! Temporarily re enables interrupts (in a scope where they are disabled)
+        Thread::yield(); //!  Suggests the kernel to pause the current thread, and run another one. 
+    }
+}
+
 int main()
 {
   int i, sum;
   float avg;
 
-	adcval = values = 0;
+  adcval = values = 0;
 
   InitializeADC(); //! Initializes the board
   InitializeTimer(); //! Initializes the timer

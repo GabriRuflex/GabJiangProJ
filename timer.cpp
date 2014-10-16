@@ -1,3 +1,8 @@
+/*!
+* \brief  Initializes the timer.
+* \param  void
+* \return void: None
+*/
 void InitializeTimer()
 {
   RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; //! Enables the Low Speed APB (APB1) peripheral clock.

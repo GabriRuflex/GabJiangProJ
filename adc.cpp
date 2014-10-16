@@ -1,6 +1,10 @@
+/*!
+* \brief  Initializes the ADC_StructInit members.
+* \param  ADC_InitStruct pointer to an ADC_InitTypeDef structure that contains the configuration information for the specified ADC peripheral.
+* \return void: None
+*/
 void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 {
-  //! Initializes the ADC_StructInit members
   ADC_InitStruct->ADC_Resolution = ADC_Resolution_12b; //! Sets the ADC resolution to 12bit
   ADC_InitStruct->ADC_ScanConvMode = DISABLE; //! Disables the Scan Conversion mode
   ADC_InitStruct->ADC_ContinuousConvMode = DISABLE; //! Disables the Continuous Conversion mode
@@ -15,7 +19,7 @@ void ADC_StructInit(ADC_InitTypeDef* ADC_InitStruct)
 
 /*!
 * \brief  Deinitializes all ADCs peripherals registers to their default reset values.
-* \param  void: None
+* \param  void
 * \return void: None
 */
 void ADC_DeInit(void)
@@ -26,8 +30,8 @@ void ADC_DeInit(void)
   
 /*!
 * \brief  Initializes the ADCx peripheral according to the specified parameters in the ADC_InitStruct.
-* \param  ADCx: where x can be 1, 2 or 3 to select the ADC peripheral.
-* \param  ADC_InitStruct: pointer to an ADC_InitTypeDef structure that contains the configuration information for the specified ADC peripheral.
+* \param  ADCx where x can be 1, 2 or 3 to select the ADC peripheral.
+* \param  ADC_InitStruct pointer to an ADC_InitTypeDef structure that contains the configuration information for the specified ADC peripheral.
 * \return void: None
 */
 void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
@@ -66,7 +70,6 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
   ADCx->CR2 = tmpreg1; //! Writes to ADCx CR2
   /*!---------------------------- ADCx SQR1 Configuration -----------------*/
   tmpreg1 = ADCx->SQR1; //! Gets the ADCx SQR1 value
-
   tmpreg1 &= ADC_SQR1_L; //! Clears L bits
 
   //! Configures ADCx: regular channel sequence length
@@ -103,6 +106,11 @@ void ADC_Init(ADC_TypeDef* ADCx, ADC_InitTypeDef* ADC_InitStruct)
   ADCx->SQR3 = tmpreg1; //! Stores the new register value
 }
 
+/*!
+* \brief  Initializes the ADC.
+* \param  void
+* \return void: None
+*/
 void InitializeADC()
 {
   ADC_InitTypeDef ADC_InitStructure;
@@ -119,7 +127,6 @@ void InitializeADC()
   ADC_Init(ADC1, &ADC_InitStructure); //! ADC1 Configuration
 
   ADC1->CR1 |= (uint32_t)ADC_CR1_EOCIE; //! Enable Interrupts
-
   ADC1->CR2 |= (uint32_t)ADC_CR2_ADON; //! ADC Power ON
 
 #ifdef DEBUG
@@ -136,24 +143,18 @@ void InitializeADC()
 #endif
 }
 
-void DisableADC()
-{
-  NVIC_DisableIRQ(ADC_IRQn); //! Disable the ADC Interrupts
-}
-
-void EnableADC()
-{
-  NVIC_ClearPendingIRQ(ADC_IRQn);
-  NVIC_SetPriority(ADC_IRQn,  15); //! Set the lowest priority to ADC Interrupts
-  NVIC_EnableIRQ(ADC_IRQn); //! Enable the ADC Interrupts
-}
-/**************************************************************************************/
+/*!
+* \brief  Handles the values returned by ADC.
+* \param  void
+* \return void: None
+*/
 void handleADC()
 {
   adcval = (uint16_t)ADC1->DR; //! Run acquisition
   buffer[values] = adcval; //! Save the value to the buffer
   values++; //! Increases the number of values
 
+#ifdef DEBUG
 /*!
   Enables board's leds blinking to show values
   led green: between 0 and 299
@@ -161,7 +162,6 @@ void handleADC()
   led red: between 400 and 499
   led blue: the remaining values
 */
-#ifdef DEBUG
   if (adcval < 300)
   {
     ledGreen::high();
@@ -191,54 +191,4 @@ void handleADC()
     ledBlue::high();
   }
 #endif
-}
-/**************************************************************************************/
-void __attribute__((naked)) ADC_IRQHandler()
-{
-  saveContext();
-  asm volatile("bl _Z17ADCIRQHandlerImplv"); //! Before restore context, calls the interrupt's handler
-  restoreContext();
-}
-
-void __attribute__((used)) ADCIRQHandlerImpl()
-{
-  //! Check the status of the EOC ADC interrupt
-  if (((((ADC1->SR & ADC_SR_EOC) != (uint32_t)RESET) && (ADC1->CR1 & ADC_CR1_EOCIE)) && (values < NVAL)) && waiting != 0)
-  {
-    ADC1->SR &= ~(uint32_t)ADC_SR_EOC; //! Clears the selected ADC interrupt pending bits
-
-    handleADC(); //! Handles the end of ADC's conversion
-
-    if (NVAL == values) //! If the buffer is completely full, disables ADC interrupts and wakeup the main thread (which has higher priority)
-    {
-      DisableADC(); //! Disables ADC interrupts
-
-      if(waiting == 0) {
-        return; //! If there isn't waiting thread, terminates execution
-      }
-
-      waiting->IRQwakeup(); //! Wakes up waiting thread
-
-      if(waiting->IRQgetPriority() > Thread::IRQgetCurrentThread()->IRQgetPriority()) {
-		    Scheduler::IRQfindNextThread(); //! Finds next thread to execute
-      }
-
-      waiting = 0; //! There is no more waiting thread, main was woken up
-    }
-  }
-}
-
-void waitForADC()
-{
-    FastInterruptDisableLock dLock; //! Disables interrupts
-    waiting = Thread::IRQgetCurrentThread(); //! Sets current thread (main) as waiting
-    
-    EnableADC(); //! Enables ADC's interrupts
-
-    while(waiting)
-    {
-        Thread::IRQwait(); //! Puts the current thread in wait status (in a piece of code where interrupts are disabled)
-        FastInterruptEnableLock eLock(dLock); //! Temporarily re enables interrupts (in a scope where they are disabled)
-        Thread::yield(); //!  Suggests the kernel to pause the current thread, and run another one. 
-    }
 }

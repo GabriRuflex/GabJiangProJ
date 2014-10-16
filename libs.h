@@ -13,4 +13,5 @@ using namespace miosix;
 #include "adc.h"
 
 #include "adc.cpp"
+#include "adcIRQ.cpp"
 #include "timer.cpp"
